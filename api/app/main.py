@@ -79,7 +79,7 @@ def _as_uuid(value: str | None) -> uuid.UUID | None:
 def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
     """Parent asks a question. Runs the agent, logs the inquiry for the operator
     inbox, and returns a renderable answer."""
-    result = agent.answer_question(db, body.question)
+    result = agent.answer_question(db, body.question, asker_id=_as_uuid(body.asker_id))
 
     # Small talk (greetings, thanks) isn't a question the operator needs to see.
     if result.get("log", True):

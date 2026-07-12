@@ -15,6 +15,7 @@ Both paths produce the same response shape (see the message `kind`s).
 from __future__ import annotations
 
 import re
+import uuid
 from datetime import date
 from typing import Literal
 
@@ -29,6 +30,15 @@ FALLBACK_PHONE_MSG = (
     "so I've passed it to our staff. Someone from Sunnyside will follow up with "
     "you shortly."
 )
+
+# Live-data tool results aren't graph entities, so they carry a `ref` token the
+# model cites instead of an entity id. Each maps to how we show provenance.
+LIVE_SOURCES: dict[str, tuple[str, str]] = {
+    "live:menu": ("per Today’s Menu", "Today's Menu · synced from the kitchen this morning."),
+    "live:programs": ("per our Programs", "Live from Sunnyside's program roster."),
+    "live:center": ("per our Center details", "Live from Sunnyside's profile."),
+    "live:children": ("per your enrollment record", "Live from your family's record."),
+}
 
 
 def group_key(text: str) -> str:
@@ -98,7 +108,12 @@ def _sensitive_response(db: Session, question: str, category: str) -> dict:
 
 def _answer_response(db, question, answer, citation, source, citations, confidence) -> dict:
     top_id = citations[0] if citations else None
-    if top_id == "meals" or any(w in question.lower() for w in ["lunch", "menu", "today's food"]):
+    menu_wanted = (
+        "live:menu" in (citations or [])
+        or top_id == "meals"
+        or any(w in question.lower() for w in ["lunch", "menu", "today's food"])
+    )
+    if menu_wanted:
         menu = todays_menu(db)
         if menu:
             r = _base(question, status="answered", category=None, needs_escalation=False,
@@ -121,11 +136,14 @@ def _answer_response(db, question, answer, citation, source, citations, confiden
 def _citation_details(db: Session, citations: list[str]) -> tuple[str | None, str | None]:
     if not citations:
         return None, None
-    top = retrieval.get_entity(db, citations[0])
-    if not top:
+    top = citations[0]
+    if top in LIVE_SOURCES:  # live-data source, not a graph entity
+        return LIVE_SOURCES[top]
+    e = retrieval.get_entity(db, top)
+    if not e:
         return None, None
-    srcs = top.get("sources") or []
-    return f"per {top['name']}", (srcs[0] if srcs else top.get("snippet"))
+    srcs = e.get("sources") or []
+    return f"per {e['name']}", (srcs[0] if srcs else e.get("snippet"))
 
 
 # --------------------------------------------------------------------------- #
@@ -133,13 +151,14 @@ def _citation_details(db: Session, citations: list[str]) -> tuple[str | None, st
 # --------------------------------------------------------------------------- #
 
 
-def _bedrock_answer(db: Session, question: str) -> dict:
+def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = None) -> dict:
     from langchain_core.tools import tool
     from langgraph.prebuilt import create_react_agent
     from pydantic import BaseModel, Field
 
     from app.llm import get_chat_model
 
+    # --- Knowledge-graph tools (the stored source of truth) ---
     @tool
     def search_graph(query: str) -> list[dict]:
         """Search the center's knowledge graph for entities relevant to a query."""
@@ -155,14 +174,84 @@ def _bedrock_answer(db: Session, question: str) -> dict:
         """Get entities directly related (1 hop) to the given entity."""
         return retrieval.expand_neighbors(db, entity_id)
 
+    # --- Live-data tools (query the database directly, not the graph) ---
+    @tool
+    def get_todays_menu() -> dict:
+        """Today's lunch and snacks, synced live from the kitchen. Use for any
+        menu/lunch/food question. Cite ref 'live:menu'."""
+        menu = todays_menu(db)
+        return {"ref": "live:menu", "items": menu or [], "posted": bool(menu)}
+
+    @tool
+    def get_programs() -> dict:
+        """The center's live program roster — each program's name, age range,
+        staff-to-child ratio, and room. Cite ref 'live:programs'."""
+        rows = db.scalars(select(models.Program).order_by(models.Program.name)).all()
+        return {
+            "ref": "live:programs",
+            "programs": [
+                {"name": p.name, "age_range": p.age_range, "ratio": p.ratio, "room": p.room}
+                for p in rows
+            ],
+        }
+
+    @tool
+    def get_center_info() -> dict:
+        """The center's live profile — name, phone, address, and operating hours.
+        Cite ref 'live:center'."""
+        cfg = db.get(models.CenterConfig, 1)
+        if not cfg:
+            return {"ref": "live:center"}
+        return {
+            "ref": "live:center",
+            "name": cfg.name,
+            "phone": cfg.phone,
+            "address": cfg.address,
+            "hours": cfg.hours,
+        }
+
+    tools = [
+        search_graph, get_entity, expand_neighbors,
+        get_todays_menu, get_programs, get_center_info,
+    ]
+
+    # Personalized tool — only registered for an authenticated parent, and
+    # scoped strictly to that parent's own children (never another family's).
+    if asker_id is not None:
+        @tool
+        def get_my_children() -> dict:
+            """The asking family's enrolled children — each child's first name,
+            program, room, and age range. Use for personal questions like
+            'what room is my child in?'. Cite ref 'live:children'."""
+            kids = db.scalars(
+                select(models.Child).where(models.Child.parent_id == asker_id)
+            ).all()
+            return {
+                "ref": "live:children",
+                "children": [
+                    {
+                        "name": c.name,
+                        "program": c.program.name if c.program else None,
+                        "room": c.program.room if c.program else None,
+                        "age_range": c.program.age_range if c.program else None,
+                    }
+                    for c in kids
+                ],
+            }
+
+        tools.append(get_my_children)
+
     class Answer(BaseModel):
         intent: Literal["greeting", "answer", "unknown"] = Field(
             description="greeting = small talk/thanks; answer = a center question you "
-            "answered from the tools; unknown = a center question the graph can't answer."
+            "answered from the tools; unknown = a center question no tool can answer."
         )
         answer: str = Field(description="Reply text: the grounded answer, a warm greeting, or empty if unknown.")
         confidence: float = Field(description="0..1 confidence the answer is correct and grounded.")
-        citations: list[str] = Field(description="Entity ids the answer is grounded in (empty for greeting/unknown).")
+        citations: list[str] = Field(
+            description="What the answer is grounded in: knowledge-graph entity ids "
+            "and/or live-tool refs (e.g. 'live:menu'). Empty for greeting/unknown."
+        )
 
     cfg = db.get(models.CenterConfig, 1)
     center = cfg.name if cfg else "the center"
@@ -170,22 +259,28 @@ def _bedrock_answer(db: Session, question: str) -> dict:
         f"You are Sunny, the AI front desk for {center}, chatting with a parent.\n"
         "- Greetings or small talk (hi, thanks, how are you): reply warmly and briefly, "
         "invite a question, DO NOT use tools. Set intent='greeting'.\n"
-        "- A question about the center: use the tools to find the answer, ground it in "
-        "retrieved entities, and list the entity ids you used in `citations`. Set "
-        "intent='answer'. Be warm, concise, and specific.\n"
-        "- A center question the graph does not cover: set intent='unknown', answer='', "
-        "no citations. NEVER guess or use outside knowledge.\n"
+        "- A question about the center: use the tools to find the answer and ground it. "
+        "For policies and general info use the knowledge-graph tools (search_graph, "
+        "get_entity, expand_neighbors). For information that changes or is specific to "
+        "this family, use the LIVE tools: get_todays_menu (menu/lunch), get_programs "
+        "(ages/ratios/rooms), get_center_info (phone/address/hours)"
+        + (", get_my_children (this family's kids/rooms)" if asker_id is not None else "")
+        + ". List every source you used in `citations` — entity ids and/or live refs "
+        "like 'live:menu'. Set intent='answer'. Be warm, concise, and specific.\n"
+        "- A question no tool can answer: set intent='unknown', answer='', no citations. "
+        "NEVER guess or use outside knowledge.\n"
         "Return the structured Answer."
     )
     agent = create_react_agent(
         get_chat_model(settings.bedrock_parent_model),
-        tools=[search_graph, get_entity, expand_neighbors],
+        tools=tools,
         prompt=system,
         response_format=Answer,
     )
     result = agent.invoke({"messages": [{"role": "user", "content": question}]})
     s: Answer = result["structured_response"]
-    valid = [cid for cid in s.citations if retrieval.get_entity(db, cid)]
+    # A citation is valid if it's a real entity or a known live-data ref.
+    valid = [c for c in s.citations if c in LIVE_SOURCES or retrieval.get_entity(db, c)]
     citation, source = _citation_details(db, valid)
     return {
         "intent": s.intent,
@@ -197,14 +292,14 @@ def _bedrock_answer(db: Session, question: str) -> dict:
     }
 
 
-def _answer_bedrock(db: Session, question: str) -> dict:
+def _answer_bedrock(db: Session, question: str, asker_id: uuid.UUID | None = None) -> dict:
     # Safety net first, deterministically — sensitive topics always escalate,
     # without depending on (or paying for) the model.
     sensitive = escalation.classify_sensitive(question)
     if sensitive is not None:
         return _sensitive_response(db, question, sensitive)
 
-    raw = _bedrock_answer(db, question)
+    raw = _bedrock_answer(db, question, asker_id)
     if raw["intent"] == "greeting":
         return _greeting_response(question, raw["answer"] or "Hi! How can I help you today?")
     # Trust an 'answer' only if it actually cites a real entity.
@@ -315,8 +410,15 @@ def _answer_mock(db: Session, question: str) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def answer_question(db: Session, question: str) -> dict:
-    """Full pipeline. Returns a shape the frontend can render directly."""
+def answer_question(
+    db: Session, question: str, asker_id: uuid.UUID | None = None
+) -> dict:
+    """Full pipeline. Returns a shape the frontend can render directly.
+
+    `asker_id` is the authenticated parent (server-derived, never client-trusted);
+    it scopes the personalized live-data tool to that family. The mock path has no
+    tool-calling, so it ignores it.
+    """
     if settings.bedrock_enabled:
-        return _answer_bedrock(db, question)
+        return _answer_bedrock(db, question, asker_id)
     return _answer_mock(db, question)
