@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import KnowledgeGraph from "@/components/KnowledgeGraph";
 import {
   applyChange,
   changelog as seedChangelog,
   fetchChangelog,
+  importHandbook,
   inbox,
   proposeChange,
   statusStyles,
   suggestions,
   type ChangelogEntry,
+  type IngestReport,
   type Proposal,
 } from "@/lib/frontDesk";
 
@@ -57,11 +60,34 @@ export default function OperatorView({
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<ChangelogEntry[]>(seedChangelog);
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestReport, setIngestReport] = useState<IngestReport | null>(null);
+  const [ingestError, setIngestError] = useState<string | null>(null);
+  const [graphToken, setGraphToken] = useState(0);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const refreshLog = () => fetchChangelog().then(setLog).catch(() => {});
   useEffect(() => {
     refreshLog();
   }, []);
+
+  const onHandbookPicked = async (file: File | undefined) => {
+    if (!file || ingesting) return;
+    setIngesting(true);
+    setIngestReport(null);
+    setIngestError(null);
+    try {
+      const report = await importHandbook(file);
+      setIngestReport(report);
+      refreshLog();
+      setGraphToken((t) => t + 1);
+    } catch (e) {
+      setIngestError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setIngesting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   const propose = async () => {
     const t = authorText.trim();
@@ -86,6 +112,7 @@ export default function OperatorView({
       await applyChange(proposal.changes, proposal.summary, true);
       setProposalState("confirmed");
       refreshLog();
+      setGraphToken((t) => t + 1);
     } catch {
       /* noop */
     } finally {
@@ -108,6 +135,7 @@ export default function OperatorView({
       setProposalState("confirmed");
       setAuthorText("");
       refreshLog();
+      setGraphToken((t) => t + 1);
     } catch {
       /* noop */
     } finally {
@@ -447,9 +475,200 @@ export default function OperatorView({
               precise change and check it against what parents already see.
             </div>
 
+            {/* Import from a handbook PDF */}
             <div
               style={{
                 marginTop: 22,
+                background: "#FFFFFF",
+                border: "1px solid #EBEFF4",
+                borderRadius: 20,
+                padding: 20,
+                boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 9,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: "#18181D",
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#5463D6"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <path d="M17 8l-5-5-5 5" />
+                  <path d="M12 3v12" />
+                </svg>
+                Import from a handbook
+              </div>
+              <div
+                style={{
+                  fontSize: "13.5px",
+                  color: "#5C5E6A",
+                  marginTop: 8,
+                  lineHeight: 1.5,
+                }}
+              >
+                Upload your family handbook (PDF). The AI reads it and turns each
+                policy into a reviewable, cited entry parents can ask about — no
+                retyping.
+              </div>
+
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                style={{ display: "none" }}
+                onChange={(e) => onHandbookPicked(e.target.files?.[0])}
+              />
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  marginTop: 16,
+                }}
+              >
+                <button
+                  className="fd-primary"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={ingesting}
+                  style={{
+                    background: ingesting ? "#9AA3E6" : "#5463D6",
+                    color: "#FFFFFF",
+                    border: "none",
+                    borderRadius: 12,
+                    padding: "11px 20px",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: ingesting ? "default" : "pointer",
+                    transition: "background .15s",
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 9,
+                  }}
+                >
+                  {ingesting && (
+                    <span
+                      style={{
+                        width: 15,
+                        height: 15,
+                        borderRadius: 999,
+                        border: "2px solid rgba(255,255,255,.4)",
+                        borderTopColor: "#FFFFFF",
+                        display: "inline-block",
+                        animation: "fdSpin .7s linear infinite",
+                      }}
+                    />
+                  )}
+                  {ingesting ? "Reading your handbook…" : "Upload PDF"}
+                </button>
+                <div style={{ flex: 1, fontSize: "12.5px", color: "#737685" }}>
+                  {ingesting
+                    ? "Extracting policies — this can take a minute for a full handbook."
+                    : "PDF only. Existing curated facts stay untouched."}
+                </div>
+              </div>
+
+              {ingestError && (
+                <div
+                  style={{
+                    marginTop: 14,
+                    background: "#FDEFF2",
+                    border: "1px solid #F6C9D2",
+                    borderRadius: 12,
+                    padding: "12px 14px",
+                    fontSize: "13.5px",
+                    color: "#CF193A",
+                    fontWeight: 600,
+                  }}
+                >
+                  {ingestError}
+                </div>
+              )}
+
+              {ingestReport && (
+                <div
+                  style={{
+                    marginTop: 14,
+                    background: "#E7F7EE",
+                    border: "1px solid #BFE9CF",
+                    borderRadius: 14,
+                    padding: "14px 16px",
+                    animation: "fdUp .3s ease both",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "14.5px",
+                      fontWeight: 700,
+                      color: "#1A6B3D",
+                    }}
+                  >
+                    Imported {ingestReport.created} entries from{" "}
+                    {ingestReport.pages} pages.
+                    {ingestReport.replaced
+                      ? ` Replaced ${ingestReport.replaced} from a prior import.`
+                      : ""}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "12.5px",
+                      color: "#3E8259",
+                      marginTop: 3,
+                    }}
+                  >
+                    {ingestReport.mode === "bedrock"
+                      ? "Extracted by AI and embedded for search — parents can ask about these now."
+                      : "Extracted offline (AI extractor unavailable) — parents can ask about these now."}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 7,
+                      marginTop: 11,
+                    }}
+                  >
+                    {Object.entries(ingestReport.by_type)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([type, n]) => (
+                        <span
+                          key={type}
+                          style={{
+                            background: "#FFFFFF",
+                            border: "1px solid #BFE9CF",
+                            color: "#227A47",
+                            fontSize: "11.5px",
+                            fontWeight: 700,
+                            padding: "4px 10px",
+                            borderRadius: 999,
+                          }}
+                        >
+                          {type} {n}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                marginTop: 18,
                 background: "#FFFFFF",
                 border: "1px solid #EBEFF4",
                 borderRadius: 20,
@@ -810,6 +1029,8 @@ export default function OperatorView({
                 </div>
               </div>
             )}
+
+            <KnowledgeGraph reloadToken={graphToken} />
           </div>
         )}
 

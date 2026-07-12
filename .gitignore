@@ -36,3 +36,6 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo

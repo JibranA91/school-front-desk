@@ -1,6 +1,8 @@
+import tempfile
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,7 +13,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.db import get_db, init_db
-from app import agent, authoring, models, retrieval
+from app import agent, authoring, ingest, models, retrieval
 from app.routers import auth as auth_router
 
 
@@ -128,6 +130,34 @@ def author_apply(body: AuthorApplyRequest, db: Session = Depends(get_db)) -> dic
     )
 
 
+@app.post("/ingest")
+async def ingest_handbook(
+    file: UploadFile = File(...),
+    label: str = Form("Family Handbook"),
+    actor: str = Form("Operator"),
+    replace: bool = Form(True),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Ingest an uploaded handbook PDF into the knowledge graph. The extraction
+    agent (Sonnet when Bedrock is on) turns it into typed `hb-` entities; retrieval
+    picks them up immediately. `replace` clears any prior handbook import first."""
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Please upload a PDF.")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+
+    removed = ingest.clear_ingested(db) if replace else 0
+    tmp_path = Path(tempfile.gettempdir()) / f"handbook-{uuid.uuid4().hex}.pdf"
+    try:
+        tmp_path.write_bytes(data)
+        report = ingest.ingest_pdf(db, tmp_path, source_label=label, actor=actor)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    report["replaced"] = removed
+    return report
+
+
 @app.get("/changelog")
 def changelog(db: Session = Depends(get_db)) -> list[dict]:
     rows = db.scalars(
@@ -154,6 +184,25 @@ def changelog(db: Session = Depends(get_db)) -> list[dict]:
             }
         )
     return out
+
+
+@app.get("/graph")
+def graph(db: Session = Depends(get_db)) -> dict:
+    """The knowledge graph for visualization: typed nodes + relationship edges."""
+    entities = db.scalars(select(models.KbEntity)).all()
+    rels = db.scalars(select(models.KbRelationship)).all()
+    nodes = [
+        {
+            "id": e.id,
+            "type": e.type,
+            "name": e.name,
+            "source": (e.sources[0] if e.sources else None),
+            "handbook": e.id.startswith("hb-"),
+        }
+        for e in entities
+    ]
+    edges = [{"source": r.src_id, "target": r.dst_id, "rel": r.rel} for r in rels]
+    return {"nodes": nodes, "edges": edges}
 
 
 @app.get("/inbox")

@@ -106,6 +106,60 @@ export async function applyChange(
   return res.json();
 }
 
+// ---- Operator: handbook ingestion (upload a PDF → typed graph entities) ----
+
+export interface IngestReport {
+  source: string;
+  mode: "bedrock" | "heuristic";
+  pages: number;
+  chunks: number;
+  created: number;
+  by_type: Record<string, number>;
+  replaced?: number;
+}
+
+export async function importHandbook(
+  file: File,
+  label?: string
+): Promise<IngestReport> {
+  const body = new FormData();
+  body.append("file", file, file.name);
+  if (label) body.append("label", label);
+  const res = await fetch("/api/ingest", { method: "POST", body });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({}));
+    throw new Error(msg?.error ?? `ingest failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// ---- Operator: knowledge-graph visualization ----
+
+export interface GraphNode {
+  id: string;
+  type: string;
+  name: string;
+  source: string | null;
+  handbook: boolean;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  rel: string;
+}
+
+export interface KnowledgeGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export async function fetchGraph(): Promise<KnowledgeGraph> {
+  const res = await fetch("/api/graph", { cache: "no-store" });
+  if (!res.ok) throw new Error(`graph failed: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchChangelog(): Promise<ChangelogEntry[]> {
   const res = await fetch("/api/changelog");
   if (!res.ok) throw new Error(`changelog failed: ${res.status}`);

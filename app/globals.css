@@ -63,6 +63,11 @@ button:focus-visible {
     transform: none;
   }
 }
+@keyframes fdSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 @keyframes fdBlink {
   0%,
   60%,
