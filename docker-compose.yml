@@ -17,15 +17,16 @@ services:
 
   api:
     build: ./api
+    # AWS creds (and any overrides) come from api/.env — see api/.env.example.
+    # Optional: without it, the API runs with the mock LLM (bedrock:false).
+    env_file:
+      - path: ./api/.env
+        required: false
     environment:
+      # These win over env_file — container-network values, not local ones.
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/frontdesk
       WEB_ORIGIN: http://localhost:3000
       AUTH_SHARED_SECRET: ${AUTH_SHARED_SECRET:-dev-shared-secret-change-me}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-    # Mount the host AWS credentials read-only so Bedrock works in the container
-    # (boto3's default chain reads /root/.aws). Falls back to the mock LLM if absent.
-    volumes:
-      - ${USERPROFILE:-${HOME}}/.aws:/root/.aws:ro
     ports:
       - "8001:8000"
     depends_on:
