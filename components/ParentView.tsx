@@ -15,23 +15,31 @@ export default function ParentView() {
   const [typing, setTyping] = useState(false);
   const [openSources, setOpenSources] = useState<number[]>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sendingRef = useRef(false); // pause polling mid-send to keep optimistic UI
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, typing]);
 
-  // Load the persisted transcript on mount, and refresh when the tab regains
-  // focus so a staff reply sent from the operator console shows up.
+  // Keep the transcript live: load on mount, poll for new staff replies, and
+  // refresh on tab focus. Polling is skipped while a send is in flight so it
+  // doesn't clobber the optimistic user/assistant bubbles. (DB-only endpoint,
+  // cheap to poll; a websocket would be the production upgrade.)
   useEffect(() => {
-    const load = () => fetchHistory().then(setMessages).catch(() => {});
+    const load = () => {
+      if (sendingRef.current) return;
+      fetchHistory().then(setMessages).catch(() => {});
+    };
     load();
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", load);
+    const poll = setInterval(load, 2500);
     return () => {
+      clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", load);
     };
@@ -46,6 +54,7 @@ export default function ParentView() {
     const t = (text || "").trim();
     if (!t) return;
     const uid = Date.now();
+    sendingRef.current = true;
     setMessages((s) => [...s, { id: uid, type: "user", text: t }]);
     setChatInput("");
     setTyping(true);
@@ -64,6 +73,7 @@ export default function ParentView() {
       ]);
     } finally {
       setTyping(false);
+      sendingRef.current = false;
     }
   };
 

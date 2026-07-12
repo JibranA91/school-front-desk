@@ -129,6 +129,9 @@ export default function InboxPanel({
 
   useEffect(() => {
     load();
+    // Poll so newly-asked parent questions surface without a refresh.
+    const poll = setInterval(load, 4000);
+    return () => clearInterval(poll);
   }, []);
 
   // Sort by priority, then recency; collapse open gaps that share a group_key.
@@ -422,11 +425,16 @@ function InquiryDetail({
   useEffect(() => {
     let live = true;
     setThread(null);
-    fetchThread(item.id)
-      .then((t) => live && setThread(t))
-      .catch(() => {});
+    // Poll the open thread so the parent's new messages appear live.
+    const load = () =>
+      fetchThread(item.id)
+        .then((t) => live && setThread(t))
+        .catch(() => {});
+    load();
+    const poll = setInterval(load, 2500);
     return () => {
       live = false;
+      clearInterval(poll);
     };
   }, [item.id]);
 
