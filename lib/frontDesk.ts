@@ -62,7 +62,57 @@ export function resultToMessage(id: number, r: AskResult): Msg {
   };
 }
 
-// ---- Operator seed data (still mock; wired to the DB later) ----
+// ---- Operator: chat-to-author (wired to the /author agent) ----
+
+export interface Change {
+  action: "add" | "update";
+  entity_id: string;
+  entity_type: string;
+  name: string;
+  field: string;
+  old_value: string | null;
+  new_value: string;
+  is_conflict: boolean;
+  source: string | null;
+}
+
+export interface Proposal {
+  summary: string;
+  changes: Change[];
+  has_conflict: boolean;
+}
+
+export async function proposeChange(instruction: string): Promise<Proposal> {
+  const res = await fetch("/api/author/propose", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instruction }),
+  });
+  if (!res.ok) throw new Error(`propose failed: ${res.status}`);
+  return res.json();
+}
+
+export async function applyChange(
+  changes: Change[],
+  summary: string,
+  acceptConflicts: boolean
+): Promise<{ applied: string[] }> {
+  const res = await fetch("/api/author/apply", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ changes, summary, accept_conflicts: acceptConflicts }),
+  });
+  if (!res.ok) throw new Error(`apply failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchChangelog(): Promise<ChangelogEntry[]> {
+  const res = await fetch("/api/changelog");
+  if (!res.ok) throw new Error(`changelog failed: ${res.status}`);
+  return res.json();
+}
+
+// ---- Operator seed data (inbox still mock; changelog seeds the DB) ----
 
 export type InboxStatus = "answered" | "escalated" | "lowconf";
 

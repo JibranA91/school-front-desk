@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
-  changelog,
+  applyChange,
+  changelog as seedChangelog,
+  fetchChangelog,
   inbox,
+  proposeChange,
   statusStyles,
   suggestions,
+  type ChangelogEntry,
+  type Proposal,
 } from "@/lib/frontDesk";
 
 type Nav = "inbox" | "knowledge" | "changelog";
@@ -49,16 +54,74 @@ export default function OperatorView({
   const [authorText, setAuthorText] = useState("");
   const [proposalState, setProposalState] = useState<ProposalState>("idle");
   const [conflictOpen, setConflictOpen] = useState(false);
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState<ChangelogEntry[]>(seedChangelog);
 
-  const propose = () => {
-    const t = (authorText || "").toLowerCase();
-    if (!t.trim()) return;
-    if (t.includes("6:30") || t.includes("open at") || t.includes("opening")) {
-      setConflictOpen(true);
-    } else {
-      setProposalState("proposed");
+  const refreshLog = () => fetchChangelog().then(setLog).catch(() => {});
+  useEffect(() => {
+    refreshLog();
+  }, []);
+
+  const propose = async () => {
+    const t = authorText.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    try {
+      const p = await proposeChange(t);
+      setProposal(p);
+      if (p.has_conflict) setConflictOpen(true);
+      else setProposalState("proposed");
+    } catch {
+      /* leave idle */
+    } finally {
+      setBusy(false);
     }
   };
+
+  const confirmProposal = async () => {
+    if (!proposal || busy) return;
+    setBusy(true);
+    try {
+      await applyChange(proposal.changes, proposal.summary, true);
+      setProposalState("confirmed");
+      refreshLog();
+    } catch {
+      /* noop */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const discardProposal = () => {
+    setProposalState("idle");
+    setProposal(null);
+    setAuthorText("");
+  };
+
+  const resolveNew = async () => {
+    if (!proposal || busy) return;
+    setBusy(true);
+    try {
+      await applyChange(proposal.changes, proposal.summary, true);
+      setConflictOpen(false);
+      setProposalState("confirmed");
+      setAuthorText("");
+      refreshLog();
+    } catch {
+      /* noop */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resolveCurrent = () => {
+    setConflictOpen(false);
+    setProposal(null);
+    setAuthorText("");
+  };
+
+  const conflict = proposal?.changes.find((c) => c.is_conflict) ?? null;
 
   return (
     <div
@@ -558,7 +621,7 @@ export default function OperatorView({
                     marginTop: 16,
                   }}
                 >
-                  Fall &amp; winter closures
+                  {proposal?.summary}
                 </div>
                 <div
                   style={{
@@ -568,68 +631,77 @@ export default function OperatorView({
                     gap: 8,
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "flex-start",
-                      background: "#FDEFF2",
-                      borderRadius: 10,
-                      padding: "11px 13px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: "#CF193A",
-                        fontWeight: 800,
-                        fontSize: 14,
-                        lineHeight: 1.4,
-                      }}
+                  {(proposal?.changes ?? []).map((c, i) => (
+                    <div
+                      key={i}
+                      style={{ display: "flex", flexDirection: "column", gap: 8 }}
                     >
-                      –
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 14,
-                        color: "#9497A6",
-                        textDecoration: "line-through",
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      Closed Thu Nov 27 — Thanksgiving Day
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "flex-start",
-                      background: "#E7F7EE",
-                      borderRadius: 10,
-                      padding: "11px 13px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: "#227A47",
-                        fontWeight: 800,
-                        fontSize: 14,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      +
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 14,
-                        color: "#18181D",
-                        fontWeight: 600,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      Closed Thu Nov 27 &amp; Fri Nov 28 — Thanksgiving break
-                    </span>
-                  </div>
+                      {c.old_value && (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 10,
+                            alignItems: "flex-start",
+                            background: "#FDEFF2",
+                            borderRadius: 10,
+                            padding: "11px 13px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: "#CF193A",
+                              fontWeight: 800,
+                              fontSize: 14,
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            –
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 14,
+                              color: "#9497A6",
+                              textDecoration: "line-through",
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {c.name} · {c.field}: {c.old_value}
+                          </span>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "flex-start",
+                          background: "#E7F7EE",
+                          borderRadius: 10,
+                          padding: "11px 13px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: "#227A47",
+                            fontWeight: 800,
+                            fontSize: 14,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          +
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            color: "#18181D",
+                            fontWeight: 600,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {c.name} · {c.field}: {c.new_value}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <div
                   style={{
@@ -641,10 +713,7 @@ export default function OperatorView({
                 >
                   <button
                     className="fd-ghost"
-                    onClick={() => {
-                      setProposalState("idle");
-                      setAuthorText("");
-                    }}
+                    onClick={discardProposal}
                     style={{
                       background: "transparent",
                       color: "#5C5E6A",
@@ -661,7 +730,7 @@ export default function OperatorView({
                   </button>
                   <button
                     className="fd-primary"
-                    onClick={() => setProposalState("confirmed")}
+                    onClick={confirmProposal}
                     style={{
                       background: "#5463D6",
                       color: "#FFFFFF",
@@ -670,11 +739,12 @@ export default function OperatorView({
                       padding: "10px 18px",
                       fontSize: "13.5px",
                       fontWeight: 700,
-                      cursor: "pointer",
+                      cursor: busy ? "default" : "pointer",
+                      opacity: busy ? 0.7 : 1,
                       transition: "background .15s",
                     }}
                   >
-                    Confirm &amp; publish
+                    {busy ? "Publishing…" : "Confirm & publish"}
                   </button>
                 </div>
               </div>
@@ -759,7 +829,7 @@ export default function OperatorView({
               Every change to what parents see — who, what, and when.
             </div>
             <div style={{ marginTop: 24 }}>
-              {changelog.map((c, idx) => (
+              {log.map((c, idx) => (
                 <div key={idx} style={{ display: "flex", gap: 15 }}>
                   <div
                     style={{
@@ -1000,7 +1070,7 @@ export default function OperatorView({
                     marginTop: 9,
                   }}
                 >
-                  Opens 7:00 AM
+                  {conflict?.old_value}
                 </div>
                 <div
                   style={{
@@ -1010,9 +1080,9 @@ export default function OperatorView({
                     lineHeight: 1.4,
                   }}
                 >
-                  Source: Hours &amp; Schedule
+                  {conflict?.name} · {conflict?.field}
                   <br />
-                  Set 3 months ago
+                  {conflict?.source ?? "On file"}
                 </div>
               </div>
               <div
@@ -1042,7 +1112,7 @@ export default function OperatorView({
                     marginTop: 9,
                   }}
                 >
-                  Opens 6:30 AM
+                  {conflict?.new_value}
                 </div>
                 <div
                   style={{
@@ -1070,7 +1140,7 @@ export default function OperatorView({
             >
               <button
                 className="fd-ghost"
-                onClick={() => setConflictOpen(false)}
+                onClick={resolveCurrent}
                 style={{
                   background: "transparent",
                   color: "#5C5E6A",
@@ -1083,15 +1153,11 @@ export default function OperatorView({
                   transition: "all .15s",
                 }}
               >
-                Keep 7:00 AM
+                Keep {conflict?.old_value}
               </button>
               <button
                 className="fd-primary"
-                onClick={() => {
-                  setConflictOpen(false);
-                  setProposalState("confirmed");
-                  setAuthorText("");
-                }}
+                onClick={resolveNew}
                 style={{
                   background: "#5463D6",
                   color: "#FFFFFF",
@@ -1100,11 +1166,12 @@ export default function OperatorView({
                   padding: "11px 18px",
                   fontSize: "13.5px",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: busy ? "default" : "pointer",
+                  opacity: busy ? 0.7 : 1,
                   transition: "background .15s",
                 }}
               >
-                Use 6:30 AM
+                {busy ? "Publishing…" : `Use ${conflict?.new_value}`}
               </button>
             </div>
           </div>
