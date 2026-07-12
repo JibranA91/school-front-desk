@@ -1,24 +1,25 @@
 """Bedrock chat model factory (Claude via langchain-aws). Lazy — only imported
-and constructed on the real path, when AWS creds are present."""
+and constructed on the real path, when AWS creds are present. Cached per model id
+so the parent (Haiku) and operator (Sonnet) models can coexist."""
 
 from __future__ import annotations
 
-from functools import lru_cache
-
 from app.config import settings
 
+_cache: dict[str, object] = {}
 
-@lru_cache(maxsize=1)
-def get_chat_model():
-    import boto3
-    from langchain_aws import ChatBedrockConverse
 
-    client = boto3.client(
-        "bedrock-runtime",
-        region_name=settings.aws_region,
-        aws_access_key_id=settings.aws_access_key_id,
-        aws_secret_access_key=settings.aws_secret_access_key,
-    )
-    # Sonnet on Bedrock (Converse API). Model id is env-overridable to whatever
-    # inference profile is enabled in the account (Sonnet or Haiku only).
-    return ChatBedrockConverse(client=client, model=settings.bedrock_chat_model, max_tokens=1024)
+def get_chat_model(model_id: str | None = None):
+    mid = model_id or settings.bedrock_chat_model
+    if mid not in _cache:
+        import boto3
+        from langchain_aws import ChatBedrockConverse
+
+        client = boto3.client(
+            "bedrock-runtime",
+            region_name=settings.aws_region,
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+        )
+        _cache[mid] = ChatBedrockConverse(client=client, model=mid, max_tokens=1024)
+    return _cache[mid]

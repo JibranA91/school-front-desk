@@ -31,7 +31,9 @@ class Settings(BaseSettings):
     # Explicit override: set USE_BEDROCK=true/false to force on/off; None = auto-detect.
     use_bedrock: bool | None = None
 
-    # Model ids — confirmed against the claude-api skill at integration time.
+    # Model ids (Bedrock inference profiles; env-overridable to enabled models).
+    # Parent chat → Haiku (fast, cheap). Operator agents (author/cleanup) → Sonnet.
+    bedrock_parent_model: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     bedrock_chat_model: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
     embedding_dims: int = 1024
