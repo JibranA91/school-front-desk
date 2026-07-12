@@ -37,3 +37,9 @@ def init_db() -> None:
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(engine)
+    # Lightweight additive migrations (no Alembic): bring existing tables up to
+    # date without a reseed. IF NOT EXISTS makes each idempotent.
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS topic VARCHAR(40)")
+        )

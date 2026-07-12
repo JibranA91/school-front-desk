@@ -215,6 +215,7 @@ export interface InboxItem {
   text: string;
   status: InboxStatus;
   category: string | null;
+  topic: string | null;
   confidence: number | null;
   who: string;
   group_key: string | null;

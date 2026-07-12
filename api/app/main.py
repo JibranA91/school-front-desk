@@ -130,6 +130,38 @@ def _thread_messages(db: Session, parent_id: uuid.UUID) -> list[dict]:
     return [_message_to_msg(m, i + 1) for i, m in enumerate(rows)]
 
 
+# Topic (for inbox grouping) derived from what the answer was grounded in.
+_LIVE_TOPIC = {
+    "live:menu": "Meal",
+    "live:programs": "Program",
+    "live:center": "Center",
+    "live:children": "Enrollment",
+}
+_CATEGORY_TOPIC = {
+    "health": "Health",
+    "allergy": "Health",
+    "medication": "Health",
+    "safety": "Safety",
+    "billing_dispute": "Billing",
+    "custody": "Family",
+}
+
+
+def _topic_for(db: Session, result: dict) -> str | None:
+    """The subject of a question, for inbox grouping — the type of the primary
+    cited entity, else a category-derived theme, else None (Other)."""
+    cits = result.get("citations") or []
+    if cits:
+        top = cits[0]
+        if top in _LIVE_TOPIC:
+            return _LIVE_TOPIC[top]
+        entity = db.get(models.KbEntity, top)
+        if entity is not None:
+            return entity.type
+    category = result.get("category")
+    return _CATEGORY_TOPIC.get(category) if category else None
+
+
 @app.post("/ask")
 def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
     """Parent asks a question. Runs the agent, persists the turn to the parent's
@@ -168,6 +200,7 @@ def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
             text=body.question,
             status=result["status"],
             category=result.get("category"),
+            topic=_topic_for(db, result),
             confidence=result.get("confidence"),
             group_key=result.get("group_key"),
         )
@@ -373,6 +406,7 @@ def inbox(db: Session = Depends(get_db)) -> list[dict]:
             "text": r.text,
             "status": r.status,
             "category": r.category,
+            "topic": r.topic,
             "confidence": r.confidence,
             "who": _asker_context(db, r),
             "group_key": r.group_key,

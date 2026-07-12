@@ -99,6 +99,7 @@ class Inquiry(Base):
     text: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20))  # answered|escalated|lowconf|resolved
     category: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(40), nullable=True)  # grouping: entity type / theme
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     group_key: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     resolution_text: Mapped[str | None] = mapped_column(Text, nullable=True)

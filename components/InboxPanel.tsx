@@ -55,6 +55,46 @@ function collapse(items: InboxItem[]): { item: InboxItem; count: number }[] {
   return out;
 }
 
+// Friendly labels for the entity-type / theme topics stored on inquiries.
+const TOPIC_LABEL: Record<string, string> = {
+  Tuition: "Tuition & fees",
+  Billing: "Billing",
+  Hours: "Hours & schedule",
+  Meal: "Meals",
+  Health: "Health & illness",
+  Policy: "Policies",
+  Enrollment: "Enrollment & tours",
+  Program: "Programs",
+  Safety: "Safety",
+  Behavior: "Behavior & guidance",
+  Communication: "Communication",
+  Supplies: "Clothing & supplies",
+  Curriculum: "Curriculum",
+  Holiday: "Holidays & closures",
+  Attendance: "Attendance",
+  Center: "Center info",
+  Family: "Family",
+};
+const topicLabel = (t: string | null) => (t && TOPIC_LABEL[t]) || t || "Other";
+
+/** Cluster collapsed rows by topic, largest cluster first ("Other" always last). */
+function clusterByTopic(
+  rows: { item: InboxItem; count: number }[],
+): { topic: string; entries: { item: InboxItem; count: number }[] }[] {
+  const byTopic = new Map<string, { item: InboxItem; count: number }[]>();
+  for (const r of rows) {
+    const label = topicLabel(r.item.topic);
+    (byTopic.get(label) ?? byTopic.set(label, []).get(label)!).push(r);
+  }
+  return [...byTopic.entries()]
+    .map(([topic, entries]) => ({ topic, entries }))
+    .sort((a, b) => {
+      if (a.topic === "Other") return 1;
+      if (b.topic === "Other") return -1;
+      return b.entries.length - a.entries.length || a.topic.localeCompare(b.topic);
+    });
+}
+
 const SENSITIVE = new Set([
   "health",
   "allergy",
@@ -233,14 +273,43 @@ function InboxSection({
             boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
           }}
         >
-          {rows.map(({ item, count }) => (
-            <InboxRow
-              key={item.id}
-              item={item}
-              count={count}
-              dim={dim}
-              onClick={() => onOpen(item)}
-            />
+          {clusterByTopic(rows).map(({ topic, entries }) => (
+            <div key={topic}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 18px",
+                  background: "#FAFBFE",
+                  borderBottom: "1px solid #F0F3F8",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: ".04em",
+                    textTransform: "uppercase",
+                    color: "#8A8FA3",
+                  }}
+                >
+                  {topic}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#A2A6B4" }}>
+                  {entries.length}
+                </span>
+              </div>
+              {entries.map(({ item, count }) => (
+                <InboxRow
+                  key={item.id}
+                  item={item}
+                  count={count}
+                  dim={dim}
+                  onClick={() => onOpen(item)}
+                />
+              ))}
+            </div>
           ))}
         </div>
       ) : (
