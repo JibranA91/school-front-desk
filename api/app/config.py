@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     # relies solely on the injected subgraph (live-data tools are unaffected).
     kg_tools_enabled: bool = True
 
+    # Shape of the auto-injected subgraph (retrieve_subgraph):
+    retrieval_k: int = 5              # seed hits from hybrid search
+    retrieval_expand_top: int = 3     # how many top hits to expand from
+    retrieval_hops: int = 1           # relationship hops to walk
+    retrieval_max_entities: int = 25  # safety cap on total injected entities
+
     @property
     def bedrock_enabled(self) -> bool:
         if self.use_bedrock is not None:

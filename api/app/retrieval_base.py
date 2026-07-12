@@ -45,7 +45,8 @@ class Retriever(Protocol):
         """Entities one relationship hop from `entity_id` (optionally by rel type)."""
         ...
 
-    def retrieve_subgraph(self, query: str, k: int = 4, expand: bool = True) -> dict:
-        """Top-k hits plus 1-hop neighbors — the minimal relevant subgraph.
+    def retrieve_subgraph(self, query: str, k: int | None = None, expand: bool = True) -> dict:
+        """Top-k hits plus their neighbors — the minimal relevant subgraph
+        (seed count / expansion breadth / hops are the implementation's config).
         Returns {"query", "hits": [EntitySummary], "entities": [EntitySummary]}."""
         ...

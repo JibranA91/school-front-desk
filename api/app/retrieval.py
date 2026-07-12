@@ -113,15 +113,34 @@ def expand_neighbors(db: Session, entity_id: str, rel: str | None = None) -> lis
     return neighbors
 
 
-def retrieve_subgraph(db: Session, query: str, k: int = 4, expand: bool = True) -> dict:
-    """Top-k hits plus 1-hop neighbors of the strongest hits — the minimal
-    relevant subgraph handed to the agent's context."""
+def retrieve_subgraph(db: Session, query: str, k: int | None = None, expand: bool = True) -> dict:
+    """Top-k hits plus their neighbors (BFS over `retrieval_hops` relationship
+    hops from the top `retrieval_expand_top` hits) — the minimal relevant
+    subgraph handed to the agent's context. Shape is config-driven; a
+    max-entities cap guards against blow-up on a densely-linked graph."""
+    k = k or settings.retrieval_k
+    max_entities = settings.retrieval_max_entities
     hits = search_graph(db, query, k)
     subgraph: dict[str, dict] = {h["id"]: h for h in hits}
-    if expand:
-        for h in hits[:3]:
-            for n in expand_neighbors(db, h["id"]):
-                subgraph.setdefault(n["id"], n)
+
+    if expand and settings.retrieval_hops > 0:
+        frontier = [h["id"] for h in hits[: settings.retrieval_expand_top]]
+        for _ in range(settings.retrieval_hops):
+            if len(subgraph) >= max_entities:
+                break
+            next_frontier: list[str] = []
+            for entity_id in frontier:
+                for n in expand_neighbors(db, entity_id):
+                    if n["id"] not in subgraph:
+                        subgraph[n["id"]] = n
+                        next_frontier.append(n["id"])
+                        if len(subgraph) >= max_entities:
+                            break
+                if len(subgraph) >= max_entities:
+                    break
+            frontier = next_frontier
+            if not frontier:
+                break
     return {"query": query, "hits": hits, "entities": list(subgraph.values())}
 
 
@@ -148,7 +167,7 @@ class PgVectorRetriever:
         with SessionLocal() as db:
             return expand_neighbors(db, entity_id, rel)
 
-    def retrieve_subgraph(self, query: str, k: int = 4, expand: bool = True) -> dict:
+    def retrieve_subgraph(self, query: str, k: int | None = None, expand: bool = True) -> dict:
         with SessionLocal() as db:
             return retrieve_subgraph(db, query, k, expand)
 

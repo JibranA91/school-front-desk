@@ -205,7 +205,7 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
     # Automatic retrieval: pull the relevant subgraph for THIS question up front
     # and inject it below, so the model usually answers in a single pass. The
     # graph tools (added conditionally) are just an optional look-further path.
-    subgraph = kb.retrieve_subgraph(question, k=5)
+    subgraph = kb.retrieve_subgraph(question)  # shape driven by config
     knowledge = _format_subgraph(subgraph.get("entities", []))
 
     # --- Knowledge-graph tools (optional; gated by settings.kg_tools_enabled) ---
@@ -449,7 +449,7 @@ def _format_from_entity(e: dict) -> tuple[str, str, str]:
 
 
 def _mock_answer(question: str) -> dict:
-    sub = retrieval.get_retriever().retrieve_subgraph(question, k=4)
+    sub = retrieval.get_retriever().retrieve_subgraph(question)
     hits = sub["hits"]
     top = hits[0] if hits else None
     confidence = 0.0
