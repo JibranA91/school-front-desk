@@ -85,12 +85,22 @@ def _gap_response(question: str) -> dict:
     return r
 
 
+# A "while you wait" policy is attached only where a curated entity is reliably
+# the right one for the category. Retrieval-picked policies proved tangential on
+# sensitive topics (e.g. a peanut-allergy question matching a birthday-treats
+# policy), and this is the path where we're most cautious — so we map explicitly
+# and stay silent for categories without a clearly-relevant curated policy.
+_SENSITIVE_RELATED: dict[str, str] = {"health": "policy-illness"}
+
+
 def _sensitive_response(db: Session, question: str, category: str) -> dict:
     related = ""
-    if category in {"health", "allergy", "medication"}:
-        pol = retrieval.get_entity(db, "policy-illness")
-        if pol and (pol.get("attributes") or {}).get("body"):
-            related = " While you wait: " + pol["attributes"]["body"]
+    entity_id = _SENSITIVE_RELATED.get(category)
+    if entity_id:
+        pol = retrieval.get_entity(db, entity_id)
+        body = (pol.get("attributes") or {}).get("body") if pol else None
+        if isinstance(body, str) and body:
+            related = f" While you wait, here's our related policy — {pol['name']}: {body}"
     r = _base(question, status="escalated", category=category, needs_escalation=True,
               confidence=1.0, citations=[], log=True)
     r.update(

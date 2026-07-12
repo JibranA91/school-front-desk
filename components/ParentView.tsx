@@ -547,7 +547,7 @@ export default function ParentView() {
                         color: "#9A5A00",
                       }}
                     >
-                      A teacher will reach out shortly — usually within the hour.
+                      A teacher will follow up with you as soon as they can.
                     </span>
                   </div>
                 </div>
