@@ -160,13 +160,27 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
         if (!ctx) return;
         ctx.clearRect(0, 0, width, height);
 
-        // Edges
+        // Edges. Authored typed edges (servedBy, …) read stronger than the
+        // similarity ("related") links. When hovering, only the incident edges
+        // stay visible so the node's neighborhood pops.
         for (const e of edges) {
           const a = index.get(e.source)!;
           const b = index.get(e.target)!;
-          const active = hover && (e.source === hover.id || e.target === hover.id);
-          ctx.strokeStyle = active ? "#5463D6" : "#D5DBE8";
-          ctx.lineWidth = active ? 1.8 : 1;
+          const incident = hover && (e.source === hover.id || e.target === hover.id);
+          const authored = e.rel !== "related";
+          if (hover && !incident) {
+            ctx.strokeStyle = "#EAEEF5";
+            ctx.lineWidth = 0.8;
+          } else if (incident) {
+            ctx.strokeStyle = "#5463D6";
+            ctx.lineWidth = 1.8;
+          } else if (authored) {
+            ctx.strokeStyle = "#9FA8E0";
+            ctx.lineWidth = 1.4;
+          } else {
+            ctx.strokeStyle = "#D9DFEA";
+            ctx.lineWidth = 0.9;
+          }
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
@@ -234,7 +248,7 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
               dy = 0.1;
               d2 = dx * dx + dy * dy;
             }
-            const force = (260 * alpha) / d2;
+            const force = (300 * alpha) / d2;
             const dist = Math.sqrt(d2);
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
@@ -257,7 +271,7 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           const dx = b.x - a.x;
           const dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const k = ((dist - 60) / dist) * 0.05 * alpha;
+          const k = ((dist - 66) / dist) * 0.035 * alpha;
           a.vx += dx * k;
           a.vy += dy * k;
           b.vx -= dx * k;
@@ -335,8 +349,9 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
         </span>
       </div>
       <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
-        Every fact the front desk can draw on, grouped by type. Curated facts have
-        a white ring; imported handbook facts are solid. Hover any node.
+        Every fact the front desk can draw on. Lines link related topics; curated
+        facts have a white ring, imported handbook facts are solid. Hover any node
+        to trace its connections.
       </div>
 
       <div

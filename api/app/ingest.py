@@ -259,6 +259,79 @@ def _dedup(items: list[Extracted]) -> list[Extracted]:
     return list(best.values())
 
 
+def link_similar(
+    db: Session,
+    k: int = 3,
+    max_dist: float = 0.45,
+    rel: str = "related",
+) -> int:
+    """Connect entities by embedding similarity so the graph is navigable.
+
+    For each entity we add edges to its `k` nearest neighbours within `max_dist`
+    cosine distance (and always at least its single nearest, so nothing is
+    orphaned). Edges are undirected and deduped. Only rebuilds the `rel`
+    ("related") edges — hand-authored typed edges (servedBy, …) are untouched.
+    Uses pgvector's `<=>` operator in one lateral query rather than pulling
+    vectors into Python.
+    """
+    from sqlalchemy import bindparam, delete, text
+
+    from app import models as _m
+
+    db.execute(delete(_m.KbRelationship).where(_m.KbRelationship.rel == rel))
+
+    # k nearest neighbours per node within the distance threshold.
+    knn = db.execute(
+        text(
+            """
+            SELECT a.id AS src, nn.id AS dst
+            FROM kb_entities a
+            CROSS JOIN LATERAL (
+                SELECT b.id, a.embedding <=> b.embedding AS dist
+                FROM kb_entities b
+                WHERE b.id <> a.id AND b.embedding IS NOT NULL
+                ORDER BY a.embedding <=> b.embedding
+                LIMIT :k
+            ) nn
+            WHERE a.embedding IS NOT NULL AND nn.dist <= :max_dist
+            """
+        ).bindparams(bindparam("k", k), bindparam("max_dist", max_dist))
+    ).all()
+
+    pairs: set[tuple[str, str]] = set()
+    linked: set[str] = set()
+    for src, dst in knn:
+        pairs.add((src, dst) if src < dst else (dst, src))
+        linked.add(src)
+
+    # Orphan rescue: any node with no edge above threshold gets its single
+    # nearest neighbour, so the graph has no isolated dots.
+    orphans = db.execute(
+        text(
+            """
+            SELECT a.id AS src, nn.id AS dst
+            FROM kb_entities a
+            CROSS JOIN LATERAL (
+                SELECT b.id
+                FROM kb_entities b
+                WHERE b.id <> a.id AND b.embedding IS NOT NULL
+                ORDER BY a.embedding <=> b.embedding
+                LIMIT 1
+            ) nn
+            WHERE a.embedding IS NOT NULL
+            """
+        )
+    ).all()
+    for src, dst in orphans:
+        if src not in linked:
+            pairs.add((src, dst) if src < dst else (dst, src))
+
+    for src, dst in pairs:
+        db.add(models.KbRelationship(rel=rel, src_id=src, dst_id=dst))
+    db.commit()
+    return len(pairs)
+
+
 def clear_ingested(db: Session, id_prefix: str = "hb-") -> int:
     """Remove a previous handbook import (entities + its changelog rows), scoped
     strictly to the `id_prefix` collection. Never touches curated/operator data.
@@ -353,6 +426,9 @@ def ingest_pdf(
         )
         db.commit()
 
+    # Rebuild similarity edges so the new entities are connected in the graph.
+    edges = link_similar(db)
+
     by_type: dict[str, int] = {}
     for e in created:
         by_type[e.type] = by_type.get(e.type, 0) + 1
@@ -362,6 +438,7 @@ def ingest_pdf(
         "pages": len(pages),
         "chunks": len(chunks),
         "created": len(created),
+        "edges": edges,
         "by_type": by_type,
         "entity_ids": [e.id for e in created],
     }
