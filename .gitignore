@@ -1,6 +1,7 @@
 # Claude Code
 .plans/
 CLAUDE.md
+.claude
 
 # Dependencies
 node_modules/

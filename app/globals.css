@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #f7f9fb;
+  color: #18181d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: #5463d6;
+  text-decoration: none;
+}
+a:hover {
+  color: #6476ff;
+}
+
+::selection {
+  background: #eef1ff;
+}
+
+input,
+textarea,
+button {
+  font-family: inherit;
+}
+textarea {
+  outline: none;
+}
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid #b1baff;
+  outline-offset: 2px;
+}
+
+.fd-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.fd-scroll::-webkit-scrollbar-thumb {
+  background: #e1e6f0;
+  border-radius: 999px;
+}
+
+@keyframes fdUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fdBlink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* Hover states — !important so they win over the ported inline base styles */
+.fd-chip:hover {
+  background: #eef1ff !important;
+  border-color: #6476ff !important;
+}
+.fd-source-btn:hover {
+  background: #eef1ff !important;
+  border-color: #6476ff !important;
+}
+.fd-mic:hover {
+  color: #5463d6 !important;
+}
+.fd-send:hover {
+  background: #6476ff !important;
+}
+.fd-primary:hover {
+  background: #6476ff !important;
+}
+.fd-ghost:hover {
+  background: #f7f9fb !important;
+}
+.fd-inbox-row:hover {
+  background: #f7f9ff !important;
+}
+.fd-nav:hover {
+  filter: brightness(1.12);
+}
