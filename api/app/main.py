@@ -1,5 +1,7 @@
 import tempfile
+from collections import Counter
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
@@ -205,18 +207,96 @@ def graph(db: Session = Depends(get_db)) -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
+def _asker_context(db: Session, inq: models.Inquiry) -> str:
+    """Human label for who asked — real context for the operator ('Parent of
+    Ava · Discovery Room'), or 'Prospective family' for anonymous inquiries."""
+    if inq.child_id:
+        child = db.get(models.Child, inq.child_id)
+        if child:
+            room = child.program.room if child.program else None
+            return f"Parent of {child.name}" + (f" · {room}" if room else "")
+    if inq.asker_id:
+        user = db.get(models.User, inq.asker_id)
+        if user:
+            return user.name
+    return "Prospective family"
+
+
 @app.get("/inbox")
 def inbox(db: Session = Depends(get_db)) -> list[dict]:
     rows = db.scalars(
         select(models.Inquiry).order_by(models.Inquiry.created_at.desc())
     ).all()
+    # How many *open* inquiries share each group_key — the "3 parents asked this"
+    # demand signal for knowledge gaps.
+    open_counts = Counter(
+        r.group_key for r in rows if r.group_key and r.status != "resolved"
+    )
     return [
         {
             "id": str(r.id),
             "text": r.text,
             "status": r.status,
             "category": r.category,
+            "confidence": r.confidence,
+            "who": _asker_context(db, r),
+            "group_key": r.group_key,
+            "group_count": open_counts.get(r.group_key, 1) if r.group_key else 1,
+            "resolution_text": r.resolution_text,
             "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in rows
     ]
+
+
+class ResolveRequest(BaseModel):
+    changes: list[dict] = []
+    summary: str | None = None
+    accept_conflicts: bool = True
+    resolution_text: str | None = None
+    actor: str = "Operator"
+    actor_user_id: str | None = None
+    resolve_group: bool = True
+
+
+@app.post("/inbox/{inquiry_id}/resolve")
+def resolve_inquiry(
+    inquiry_id: str, body: ResolveRequest, db: Session = Depends(get_db)
+) -> dict:
+    """Close the learning loop: fold the operator's answer into the graph (via the
+    authoring agent) and mark the inquiry — and any open siblings sharing its
+    group_key — resolved, so the next parent gets it grounded."""
+    inq = db.get(models.Inquiry, _as_uuid(inquiry_id))
+    if inq is None:
+        raise HTTPException(status_code=404, detail="Inquiry not found.")
+
+    applied: list[str] = []
+    if body.changes:
+        result = authoring.apply(
+            db,
+            body.changes,
+            actor=body.actor,
+            summary=body.summary,
+            actor_user_id=_as_uuid(body.actor_user_id),
+            accept_conflicts=body.accept_conflicts,
+        )
+        applied = result.get("applied", [])
+
+    targets = [inq]
+    if body.resolve_group and inq.group_key:
+        siblings = db.scalars(
+            select(models.Inquiry).where(
+                models.Inquiry.group_key == inq.group_key,
+                models.Inquiry.status != "resolved",
+            )
+        ).all()
+        targets = siblings or [inq]
+
+    now = datetime.now(timezone.utc)
+    for t in targets:
+        t.status = "resolved"
+        t.resolution_text = body.resolution_text
+        t.resolved_by_id = _as_uuid(body.actor_user_id)
+        t.resolved_at = now
+    db.commit()
+    return {"resolved": [str(t.id) for t in targets], "applied": applied}

@@ -1,0 +1,719 @@
+"use client";
+
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+
+import {
+  fetchInbox,
+  proposeChange,
+  resolveInquiry,
+  statusStyles,
+  type Change,
+  type InboxItem,
+  type Proposal,
+} from "@/lib/frontDesk";
+
+const PRIORITY: Record<InboxItem["status"], number> = {
+  escalated: 0,
+  lowconf: 1,
+  answered: 2,
+  resolved: 3,
+};
+
+const SENSITIVE = new Set([
+  "health",
+  "allergy",
+  "medication",
+  "safety",
+  "billing_dispute",
+  "custody",
+]);
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  return `${Math.round(hrs / 24)} d ago`;
+}
+
+const primaryBtn = (busy = false): CSSProperties => ({
+  background: busy ? "#9AA3E6" : "#5463D6",
+  color: "#FFFFFF",
+  border: "none",
+  borderRadius: 11,
+  padding: "10px 18px",
+  fontSize: "13.5px",
+  fontWeight: 700,
+  cursor: busy ? "default" : "pointer",
+  transition: "background .15s",
+});
+
+const ghostBtn: CSSProperties = {
+  background: "transparent",
+  color: "#5C5E6A",
+  border: "1px solid #EBEFF4",
+  borderRadius: 11,
+  padding: "10px 18px",
+  fontSize: "13.5px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+export default function InboxPanel({
+  onChanged,
+  onOpenCount,
+}: {
+  onChanged?: () => void;
+  onOpenCount?: (n: number) => void;
+}) {
+  const [items, setItems] = useState<InboxItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Teach-and-fold flow state (per selected inquiry).
+  const [replyText, setReplyText] = useState("");
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [stage, setStage] = useState<"idle" | "proposed" | "resolved">("idle");
+  const [resolvedCount, setResolvedCount] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = () =>
+    fetchInbox()
+      .then(setItems)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  // Sort by priority, then recency; collapse open gaps that share a group_key.
+  const visible = useMemo(() => {
+    const sorted = [...items].sort(
+      (a, b) =>
+        PRIORITY[a.status] - PRIORITY[b.status] ||
+        (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+    );
+    const seen = new Set<string>();
+    const out: InboxItem[] = [];
+    for (const it of sorted) {
+      const openGap = it.status === "escalated" || it.status === "lowconf";
+      if (openGap && it.group_key) {
+        if (seen.has(it.group_key)) continue;
+        seen.add(it.group_key);
+      }
+      out.push(it);
+    }
+    return out;
+  }, [items]);
+
+  const openCount = useMemo(
+    () => visible.filter((i) => i.status === "escalated" || i.status === "lowconf").length,
+    [visible],
+  );
+
+  useEffect(() => {
+    onOpenCount?.(openCount);
+  }, [openCount, onOpenCount]);
+
+  const selected = items.find((i) => i.id === selectedId) ?? null;
+
+  const openDetail = (item: InboxItem) => {
+    setSelectedId(item.id);
+    setReplyText("");
+    setProposal(null);
+    setStage("idle");
+    setResolvedCount(0);
+    setErr(null);
+  };
+
+  const back = () => setSelectedId(null);
+
+  const draft = async () => {
+    const t = replyText.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const p = await proposeChange(t);
+      setProposal(p);
+      setStage("proposed");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't draft an update.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fold = async (changes: Change[]) => {
+    if (!selected || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await resolveInquiry(selected.id, {
+        changes,
+        summary: proposal?.summary,
+        acceptConflicts: true,
+        resolutionText: replyText.trim() || undefined,
+      });
+      setResolvedCount(res.resolved.length);
+      setStage("resolved");
+      onChanged?.();
+      load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't resolve.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markHandled = async () => {
+    if (!selected || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await resolveInquiry(selected.id, {
+        changes: [],
+        resolutionText: replyText.trim() || "Handled by staff.",
+      });
+      setResolvedCount(res.resolved.length);
+      setStage("resolved");
+      onChanged?.();
+      load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't resolve.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const conflict = proposal?.changes.find((c) => c.is_conflict) ?? null;
+
+  return (
+    <div style={{ padding: "30px 34px" }}>
+      {!selected ? (
+        <>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: "#18181D",
+              letterSpacing: "-.01em",
+            }}
+          >
+            Inbox
+          </div>
+          <div style={{ fontSize: 14, color: "#5C5E6A", marginTop: 4 }}>
+            Every question parents asked — newest first. {openCount} need your
+            attention. Answer a gap once and it&apos;s folded into the knowledge
+            base for the next parent.
+          </div>
+
+          <div
+            style={{
+              marginTop: 22,
+              background: "#FFFFFF",
+              border: "1px solid #EBEFF4",
+              borderRadius: 16,
+              overflow: "hidden",
+              boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
+            }}
+          >
+            {loading && (
+              <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
+                Loading inbox…
+              </div>
+            )}
+            {!loading && visible.length === 0 && (
+              <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
+                No questions yet.
+              </div>
+            )}
+            {visible.map((i) => {
+              const s = statusStyles[i.status];
+              return (
+                <div
+                  key={i.id}
+                  className="fd-inbox-row"
+                  onClick={() => openDetail(i)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 16,
+                    padding: "16px 18px",
+                    borderBottom: "1px solid #F0F3F8",
+                    cursor: "pointer",
+                    transition: "background .12s",
+                    opacity: i.status === "resolved" ? 0.6 : 1,
+                  }}
+                >
+                  <span
+                    style={{
+                      background: s.bg,
+                      color: s.color,
+                      padding: "5px 11px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {s.label}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "#18181D" }}>
+                      {i.text}
+                    </div>
+                    <div style={{ fontSize: "12.5px", color: "#737685", marginTop: 3 }}>
+                      {i.who} · {timeAgo(i.created_at)}
+                    </div>
+                  </div>
+                  {i.group_count > 1 && (
+                    <span
+                      style={{
+                        background: "#FFF1DE",
+                        color: "#B5710A",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        padding: "3px 9px",
+                        borderRadius: 999,
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {i.group_count} asked
+                    </span>
+                  )}
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#C4C8D4"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <InquiryDetail
+          item={selected}
+          replyText={replyText}
+          setReplyText={setReplyText}
+          proposal={proposal}
+          conflict={conflict}
+          stage={stage}
+          resolvedCount={resolvedCount}
+          busy={busy}
+          err={err}
+          onBack={back}
+          onDraft={draft}
+          onFold={fold}
+          onMarkHandled={markHandled}
+          onDiscardProposal={() => {
+            setProposal(null);
+            setStage("idle");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function InquiryDetail({
+  item,
+  replyText,
+  setReplyText,
+  proposal,
+  conflict,
+  stage,
+  resolvedCount,
+  busy,
+  err,
+  onBack,
+  onDraft,
+  onFold,
+  onMarkHandled,
+  onDiscardProposal,
+}: {
+  item: InboxItem;
+  replyText: string;
+  setReplyText: (v: string) => void;
+  proposal: Proposal | null;
+  conflict: Change | null;
+  stage: "idle" | "proposed" | "resolved";
+  resolvedCount: number;
+  busy: boolean;
+  err: string | null;
+  onBack: () => void;
+  onDraft: () => void;
+  onFold: (changes: Change[]) => void;
+  onMarkHandled: () => void;
+  onDiscardProposal: () => void;
+}) {
+  const s = statusStyles[item.status];
+  const sensitive = item.category ? SENSITIVE.has(item.category) : false;
+  const actionable = item.status === "escalated" || item.status === "lowconf";
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <button
+        onClick={onBack}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          color: "#5463D6",
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: "pointer",
+          padding: 0,
+          marginBottom: 16,
+        }}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+        Back to inbox
+      </button>
+
+      <div
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid #EBEFF4",
+          borderRadius: 20,
+          padding: 22,
+          boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span
+            style={{
+              background: s.bg,
+              color: s.color,
+              padding: "5px 11px",
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {s.label}
+          </span>
+          {sensitive && (
+            <span
+              style={{
+                background: "#FDEFF2",
+                color: "#CF193A",
+                padding: "5px 11px",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Sensitive · {item.category}
+            </span>
+          )}
+          {item.group_count > 1 && (
+            <span
+              style={{
+                background: "#FFF1DE",
+                color: "#B5710A",
+                padding: "5px 11px",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 800,
+              }}
+            >
+              {item.group_count} parents asked this
+            </span>
+          )}
+        </div>
+
+        <div style={{ fontSize: 19, fontWeight: 700, color: "#18181D", marginTop: 14 }}>
+          {item.text}
+        </div>
+        <div style={{ fontSize: "13px", color: "#737685", marginTop: 6 }}>
+          {item.who} · {timeAgo(item.created_at)}
+        </div>
+
+        {item.status === "resolved" && item.resolution_text && (
+          <div
+            style={{
+              marginTop: 16,
+              background: "#F7F9FB",
+              borderRadius: 12,
+              padding: "12px 14px",
+              fontSize: 14,
+              color: "#3E4252",
+            }}
+          >
+            <b>Resolution:</b> {item.resolution_text}
+          </div>
+        )}
+      </div>
+
+      {/* Teach & fold */}
+      {actionable && stage !== "resolved" && (
+        <div
+          style={{
+            marginTop: 18,
+            background: "#FFFFFF",
+            border: "1px solid #EBEFF4",
+            borderRadius: 20,
+            padding: 22,
+            boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
+          }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+            Answer &amp; teach Sunnyside
+          </div>
+          <div style={{ fontSize: "13px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
+            {sensitive
+              ? "Reply for your records. Sensitive topics still escalate to staff even after you add a note."
+              : "Write the answer in plain language. I'll fold it into the knowledge base so the next parent who asks gets it instantly and grounded."}
+          </div>
+
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder={
+              sensitive
+                ? "e.g. Called the family back; advised per our illness policy."
+                : "e.g. We offer a 3-day part-time schedule for $950/mo, Mon/Wed/Fri."
+            }
+            style={{
+              width: "100%",
+              marginTop: 13,
+              background: "#F7F9FB",
+              border: "1px solid #EBEFF4",
+              borderRadius: 14,
+              padding: 14,
+              fontSize: "14.5px",
+              lineHeight: 1.5,
+              color: "#18181D",
+              minHeight: 84,
+              resize: "none",
+            }}
+          />
+
+          {err && (
+            <div style={{ marginTop: 10, fontSize: 13, color: "#CF193A", fontWeight: 600 }}>
+              {err}
+            </div>
+          )}
+
+          {stage !== "proposed" && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 14,
+              }}
+            >
+              {sensitive && (
+                <button onClick={onMarkHandled} disabled={busy} style={ghostBtn}>
+                  {busy ? "Saving…" : "Mark handled (no change)"}
+                </button>
+              )}
+              <button onClick={onDraft} disabled={busy} style={primaryBtn(busy)}>
+                {busy ? "Drafting…" : "Draft update"}
+              </button>
+            </div>
+          )}
+
+          {/* Proposed diff + (optional) conflict resolution */}
+          {stage === "proposed" && proposal && (
+            <div style={{ marginTop: 16 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: ".04em",
+                  textTransform: "uppercase",
+                  color: "#737685",
+                }}
+              >
+                {proposal.summary}
+              </div>
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                {proposal.changes.map((c, i) => (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {c.old_value && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          background: "#FDEFF2",
+                          borderRadius: 10,
+                          padding: "11px 13px",
+                        }}
+                      >
+                        <span style={{ color: "#CF193A", fontWeight: 800 }}>–</span>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            color: "#9497A6",
+                            textDecoration: "line-through",
+                          }}
+                        >
+                          {c.name} · {c.field}: {c.old_value}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        background: "#E7F7EE",
+                        borderRadius: 10,
+                        padding: "11px 13px",
+                      }}
+                    >
+                      <span style={{ color: "#227A47", fontWeight: 800 }}>+</span>
+                      <span style={{ fontSize: 14, color: "#18181D", fontWeight: 600 }}>
+                        {c.name} · {c.field}: {c.new_value}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {conflict ? (
+                <div
+                  style={{
+                    marginTop: 14,
+                    border: "1px solid #F6D9A6",
+                    background: "#FFF9EF",
+                    borderRadius: 14,
+                    padding: 15,
+                  }}
+                >
+                  <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#8A5A00" }}>
+                    This conflicts with a fact on file ({conflict.old_value}). Which
+                    should parents see?
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      gap: 10,
+                      marginTop: 14,
+                    }}
+                  >
+                    <button onClick={onMarkHandled} disabled={busy} style={ghostBtn}>
+                      Keep {conflict.old_value}
+                    </button>
+                    <button
+                      onClick={() => onFold(proposal.changes)}
+                      disabled={busy}
+                      style={primaryBtn(busy)}
+                    >
+                      {busy ? "Publishing…" : `Use “${conflict.new_value}”`}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 10,
+                    marginTop: 16,
+                  }}
+                >
+                  <button onClick={onDiscardProposal} disabled={busy} style={ghostBtn}>
+                    Rewrite
+                  </button>
+                  <button
+                    onClick={() => onFold(proposal.changes)}
+                    disabled={busy}
+                    style={primaryBtn(busy)}
+                  >
+                    {busy ? "Publishing…" : "Confirm & fold in"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {stage === "resolved" && (
+        <div
+          style={{
+            marginTop: 18,
+            background: "#E7F7EE",
+            border: "1px solid #BFE9CF",
+            borderRadius: 16,
+            padding: "16px 18px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            animation: "fdUp .3s ease both",
+          }}
+        >
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 999,
+              background: "#3BBA6E",
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#FFFFFF"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 6 9 17l-4-4" />
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: "14.5px", fontWeight: 700, color: "#1A6B3D" }}>
+              Resolved{resolvedCount > 1 ? ` ${resolvedCount} grouped questions` : ""} —
+              the next parent who asks gets it instantly.
+            </div>
+            <div style={{ fontSize: "12.5px", color: "#3E8259", marginTop: 2 }}>
+              Logged to the changelog and folded into the knowledge graph.
+            </div>
+          </div>
+          <button onClick={onBack} style={{ ...ghostBtn, marginLeft: "auto" }}>
+            Back to inbox
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

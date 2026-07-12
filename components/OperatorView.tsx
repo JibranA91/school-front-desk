@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import InboxPanel from "@/components/InboxPanel";
 import KnowledgeGraph from "@/components/KnowledgeGraph";
 import {
   applyChange,
   changelog as seedChangelog,
   fetchChangelog,
   importHandbook,
-  inbox,
   proposeChange,
-  statusStyles,
   suggestions,
   type ChangelogEntry,
   type IngestReport,
@@ -64,6 +63,7 @@ export default function OperatorView({
   const [ingestReport, setIngestReport] = useState<IngestReport | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
   const [graphToken, setGraphToken] = useState(0);
+  const [inboxCount, setInboxCount] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const refreshLog = () => fetchChangelog().then(setLog).catch(() => {});
@@ -255,18 +255,20 @@ export default function OperatorView({
               <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
             </svg>
             <span style={{ flex: 1 }}>Inbox</span>
-            <span
-              style={{
-                background: "#FF9D17",
-                color: "#3A2200",
-                fontSize: 11,
-                fontWeight: 800,
-                padding: "2px 8px",
-                borderRadius: 999,
-              }}
-            >
-              2
-            </span>
+            {inboxCount != null && inboxCount > 0 && (
+              <span
+                style={{
+                  background: "#FF9D17",
+                  color: "#3A2200",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                }}
+              >
+                {inboxCount}
+              </span>
+            )}
           </button>
           <button
             className="fd-nav"
@@ -363,99 +365,13 @@ export default function OperatorView({
         style={{ flex: 1, overflowY: "auto", background: "#F7F9FB" }}
       >
         {nav === "inbox" && (
-          <div style={{ padding: "30px 34px" }}>
-            <div
-              style={{
-                fontSize: 24,
-                fontWeight: 800,
-                color: "#18181D",
-                letterSpacing: "-.01em",
-              }}
-            >
-              Inbox
-            </div>
-            <div style={{ fontSize: 14, color: "#5C5E6A", marginTop: 4 }}>
-              Every question parents asked — newest first. Escalations and
-              low-confidence answers surface at the top.
-            </div>
-            <div
-              style={{
-                marginTop: 22,
-                background: "#FFFFFF",
-                border: "1px solid #EBEFF4",
-                borderRadius: 16,
-                overflow: "hidden",
-                boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
-              }}
-            >
-              {inbox.map((i) => {
-                const s = statusStyles[i.status];
-                return (
-                  <div
-                    key={i.q}
-                    className="fd-inbox-row"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 16,
-                      padding: "16px 18px",
-                      borderBottom: "1px solid #F0F3F8",
-                      cursor: "pointer",
-                      transition: "background .12s",
-                    }}
-                  >
-                    <span
-                      style={{
-                        background: s.bg,
-                        color: s.color,
-                        padding: "5px 11px",
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {s.label}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 15,
-                          fontWeight: 600,
-                          color: "#18181D",
-                        }}
-                      >
-                        {i.q}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "12.5px",
-                          color: "#737685",
-                          marginTop: 3,
-                        }}
-                      >
-                        {i.who} · {i.time}
-                      </div>
-                    </div>
-                    <svg
-                      width="17"
-                      height="17"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#C4C8D4"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <InboxPanel
+            onChanged={() => {
+              refreshLog();
+              setGraphToken((t) => t + 1);
+            }}
+            onOpenCount={setInboxCount}
+          />
         )}
 
         {nav === "knowledge" && (
