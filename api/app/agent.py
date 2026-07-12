@@ -169,6 +169,25 @@ def _citation_details(citations: list[str]) -> tuple[str | None, str | None]:
     return f"per {e['name']}", (srcs[0] if srcs else e.get("snippet"))
 
 
+def _format_subgraph(entities: list[dict]) -> str:
+    """Serialize the pre-retrieved subgraph for injection into the agent context."""
+    lines = []
+    for e in entities:
+        attrs = e.get("attributes") or {}
+        body = attrs.get("body")
+        if not isinstance(body, str) or not body:
+            body = "; ".join(
+                f"{k}: {v}" for k, v in attrs.items()
+                if isinstance(v, (str, int, float)) and k != "source"
+            )
+        src = (e.get("sources") or [None])[0]
+        line = f"- [{e['id']}] ({e['type']}) {e['name']}: {body}"
+        if src:
+            line += f"  (source: {src})"
+        lines.append(line)
+    return "\n".join(lines) if lines else "(nothing relevant found in the knowledge base)"
+
+
 # --------------------------------------------------------------------------- #
 # Bedrock path — all messages through the LLM, model-classified intent.
 # --------------------------------------------------------------------------- #
@@ -181,10 +200,15 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
 
     from app.llm import get_chat_model
 
-    # --- Knowledge-graph tools (the stored source of truth) ---
     # Read through the configured Retriever — the agent never touches the store.
     kb = retrieval.get_retriever()
+    # Automatic retrieval: pull the relevant subgraph for THIS question up front
+    # and inject it below, so the model usually answers in a single pass. The
+    # graph tools (added conditionally) are just an optional look-further path.
+    subgraph = kb.retrieve_subgraph(question, k=5)
+    knowledge = _format_subgraph(subgraph.get("entities", []))
 
+    # --- Knowledge-graph tools (optional; gated by settings.kg_tools_enabled) ---
     @tool
     def search_graph(query: str) -> list[dict]:
         """Search the center's knowledge graph for entities relevant to a query."""
@@ -236,10 +260,9 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
             "hours": cfg.hours,
         }
 
-    tools = [
-        search_graph, get_entity, expand_neighbors,
-        get_todays_menu, get_programs, get_center_info,
-    ]
+    tools = [get_todays_menu, get_programs, get_center_info]
+    if settings.kg_tools_enabled:
+        tools = [search_graph, get_entity, expand_neighbors, *tools]
 
     # Personalized tool — only registered for an authenticated parent, and
     # scoped strictly to that parent's own children (never another family's).
@@ -283,35 +306,45 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
 
     cfg = db.get(models.CenterConfig, 1)
     center = cfg.name if cfg else "the center"
+    graph_tools_line = (
+        " If it's insufficient, you may also call the knowledge-graph tools "
+        "(search_graph, get_entity, expand_neighbors) to look further."
+        if settings.kg_tools_enabled
+        else ""
+    )
     system = (
-        f"You are Sunny, the AI front desk for {center}, chatting with a parent.\n"
+        f"You are Sunny, the AI front desk for {center}, chatting with a parent.\n\n"
+        "KNOWLEDGE retrieved from our records for this question (cite the id in "
+        "brackets, e.g. hb-illness-exclusion-policy, for any entry you use):\n"
+        f"{knowledge}\n\n"
         "- Greetings or small talk (hi, thanks, how are you): reply warmly and briefly, "
         "invite a question, DO NOT use tools. Set intent='greeting'.\n"
-        "- A question about the center: use the tools to find the answer and ground it. "
-        "For policies and general info use the knowledge-graph tools (search_graph, "
-        "get_entity, expand_neighbors). For information that changes or is specific to "
-        "this family, use the LIVE tools: get_todays_menu (menu/lunch), get_programs "
-        "(ages/ratios/rooms), get_center_info (phone/address/hours)"
+        "- A question about the center: answer from the KNOWLEDGE above and ground it."
+        + graph_tools_line
+        + " For information that changes or is specific to this family, use the LIVE "
+        "tools: get_todays_menu (menu/lunch), get_programs (ages/ratios/rooms), "
+        "get_center_info (phone/address/hours)"
         + (", get_my_children (this family's kids/rooms)" if asker_id is not None else "")
         + ". List every source you used in `citations` — entity ids and/or live refs "
         "like 'live:menu'. Set intent='answer'. Be warm, concise, and specific.\n"
-        "- A CENTER question no tool can answer (a real gap for staff to fill): set "
-        "intent='unknown', answer='', no citations.\n"
+        "- A CENTER question the knowledge and tools can't answer (a real gap for staff "
+        "to fill): set intent='unknown', answer='', no citations.\n"
         "- A question NOT about this childcare center at all (weather, sports, news, "
         "general trivia, unrelated requests): set intent='out_of_scope' and write a "
         "brief, friendly redirect back to what you can help with. No citations.\n"
         "\nGROUNDING — this is critical:\n"
-        "- If the tool results DO address the question, ANSWER it (intent='answer') "
-        "and cite them. Never hand off a question the knowledge base can answer.\n"
-        "- Assert ONLY what the tool results explicitly state. Never infer, extrapolate, "
-        "guess, or combine facts to fill a gap, and never use outside knowledge.\n"
-        "- If the SPECIFIC thing asked isn't in the tool results — even when related "
-        "information exists — set intent='unknown'. Related-but-not-specific is NOT an "
-        "answer. (E.g. a general fee policy doesn't let you confirm a specific discount "
-        "it never mentions.)\n"
+        "- If the KNOWLEDGE or tool results DO address the question, ANSWER it "
+        "(intent='answer') and cite them. Never hand off a question they can answer.\n"
+        "- Assert ONLY what the KNOWLEDGE/tool results explicitly state. Never infer, "
+        "extrapolate, guess, or combine facts to fill a gap, and never use outside "
+        "knowledge.\n"
+        "- If the SPECIFIC thing asked isn't present — even when related information "
+        "exists — set intent='unknown'. Related-but-not-specific is NOT an answer. "
+        "(E.g. a general fee policy doesn't let you confirm a specific discount it "
+        "never mentions.)\n"
         "- Do NOT assert a negative from absence. If a parent asks whether you offer "
-        "something and the tool results don't mention it, set intent='unknown' (staff "
-        "will confirm) rather than guessing 'no'.\n"
+        "something and it isn't present, set intent='unknown' (staff will confirm) "
+        "rather than guessing 'no'.\n"
         "Return the structured Answer."
     )
     agent = create_react_agent(

@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # knowledge base at a different store behind the same Retriever interface.
     retriever: str = "pgvector"
 
+    # The relevant subgraph is always pre-retrieved and injected into the parent
+    # agent's context. When True, the agent ALSO gets knowledge-graph tools
+    # (search_graph/get_entity/expand_neighbors) to look further; when False it
+    # relies solely on the injected subgraph (live-data tools are unaffected).
+    kg_tools_enabled: bool = True
+
     @property
     def bedrock_enabled(self) -> bool:
         if self.use_bedrock is not None:
