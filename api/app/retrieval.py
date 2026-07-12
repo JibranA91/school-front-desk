@@ -1,31 +1,29 @@
 """Hybrid retrieval over the knowledge graph: semantic (pgvector) + lexical
-(word overlap) + structural (1-hop relationship expansion). These functions are
-what the LangGraph agent will call as tools (search_graph / get_entity /
-expand_neighbors); `retrieve_subgraph` assembles the minimal relevant subgraph.
+(Postgres full-text search) + structural (1-hop relationship expansion). These
+functions are what the LangGraph agent calls as tools (search_graph / get_entity
+/ expand_neighbors); `retrieve_subgraph` assembles the minimal relevant subgraph.
+
+The lexical signal is Postgres FTS: `to_tsvector`/`plainto_tsquery` +
+`ts_rank_cd`. The `english` text-search config gives Snowball stemming
+(tour/tours, morning/mornings) and stopword removal for free, so a query like
+"do you have a swimming pool" reduces to `swimming & pool` and simply scores 0
+against entities that don't mention them — no manual stopword list needed.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import or_, select
+from sqlalchemy import Text, func, or_, select
 from sqlalchemy.orm import Session
 
 from app import models
-from app.embeddings import embed_query, tokens
+from app.embeddings import embed_query
 
 # Hybrid weights: semantic recall + lexical precision on named entities.
 W_SEMANTIC = 0.65
 W_LEXICAL = 0.35
 
-# Common words that would otherwise create false lexical matches (e.g. "do you
-# have a swimming pool" matching a policy body just because it contains "have").
-STOPWORDS = {
-    "the", "a", "an", "is", "are", "am", "be", "been", "do", "does", "did", "you",
-    "your", "yours", "i", "my", "we", "our", "it", "its", "he", "she", "they", "them",
-    "have", "has", "had", "can", "could", "will", "would", "should", "of", "to", "on",
-    "in", "for", "and", "or", "at", "by", "with", "from", "this", "that", "these",
-    "those", "what", "when", "where", "how", "why", "who", "which", "if", "so", "as",
-    "get", "got", "there", "here", "about", "any", "some", "me", "us",
-}
+# Postgres text-search configuration (stemming + stopwords).
+_TS_CONFIG = "english"
 
 
 def _summary(e: models.KbEntity) -> dict:
@@ -41,48 +39,46 @@ def _summary(e: models.KbEntity) -> dict:
     }
 
 
-def _stem(t: str) -> str:
-    # Very light singularization so tour/tours, morning/mornings match.
-    return t[:-1] if len(t) > 3 and t.endswith("s") else t
-
-
-def _lexical_score(query_tokens: set[str], e: models.KbEntity) -> float:
-    meaningful = {_stem(t) for t in (query_tokens - STOPWORDS)}
-    if not meaningful:
-        return 0.0
-    text = e.name + " " + " ".join(str(v) for v in (e.attributes or {}).values())
-    entity_tokens = {_stem(t) for t in tokens(text)}
-    hits = sum(1 for q in meaningful if q in entity_tokens)
-    return hits / len(meaningful)
+def _searchable(entity=models.KbEntity):
+    """SQL text we run FTS over: entity name + all attribute values (the JSONB
+    cast to text). Matches the breadth of what the old word-overlap scored."""
+    return entity.name + func.cast(" ", Text) + func.coalesce(
+        func.cast(entity.attributes, Text), ""
+    )
 
 
 def search_graph(db: Session, query: str, k: int = 5) -> list[dict]:
-    """Rank entities by a hybrid of semantic similarity and lexical overlap."""
+    """Rank entities by a hybrid of semantic similarity (pgvector cosine) and
+    lexical relevance (Postgres FTS ts_rank_cd). Both signals are computed in
+    one SQL pass; ts_rank_cd is min-max normalized across the result set so it
+    blends sensibly with the 0..1 cosine similarity."""
     qvec = embed_query(query)
-    qtokens = set(tokens(query))
-    dist = models.KbEntity.embedding.cosine_distance(qvec)
+    semantic = (1.0 - models.KbEntity.embedding.cosine_distance(qvec)).label("sem")
+    tsv = func.to_tsvector(_TS_CONFIG, _searchable())
+    tsq = func.plainto_tsquery(_TS_CONFIG, query)
+    lexical = func.ts_rank_cd(tsv, tsq).label("lex")
+
     rows = db.execute(
-        select(models.KbEntity, dist.label("dist"))
-        .where(models.KbEntity.embedding.is_not(None))
-        .order_by(dist)
-        .limit(max(k * 3, 10))
+        select(models.KbEntity, semantic, lexical).where(
+            models.KbEntity.embedding.is_not(None)
+        )
     ).all()
 
+    max_lex = max((float(r.lex) for r in rows), default=0.0) or 1.0
     scored = []
-    for e, d in rows:
-        semantic = 1.0 - float(d)  # cosine distance -> similarity
-        lexical = _lexical_score(qtokens, e)
-        score = W_SEMANTIC * semantic + W_LEXICAL * lexical
-        scored.append((score, semantic, lexical, e))
+    for e, sem, lex in rows:
+        s = float(sem)
+        lx = float(lex) / max_lex  # normalize FTS rank to 0..1 within this set
+        scored.append((W_SEMANTIC * s + W_LEXICAL * lx, s, lx, e))
     scored.sort(key=lambda r: r[0], reverse=True)
 
     out = []
-    for score, semantic, lexical, e in scored[:k]:
-        s = _summary(e)
-        s["score"] = round(score, 4)
-        s["semantic"] = round(semantic, 4)
-        s["lexical"] = round(lexical, 4)
-        out.append(s)
+    for score, sem, lx, e in scored[:k]:
+        summary = _summary(e)
+        summary["score"] = round(score, 4)
+        summary["semantic"] = round(sem, 4)
+        summary["lexical"] = round(lx, 4)
+        out.append(summary)
     return out
 
 
