@@ -20,10 +20,14 @@ export default auth((req) => {
     return Response.redirect(new URL("/login", nextUrl));
   }
 
-  // Operator console is operator-only. (Operators may still view the parent
-  // front desk at "/".)
+  // Operator console is operator-only.
   if (path.startsWith("/operator") && role !== "operator") {
     return Response.redirect(new URL("/", nextUrl));
+  }
+
+  // Operators don't use the parent chat — the front desk is their console.
+  if (role === "operator" && path === "/") {
+    return Response.redirect(new URL("/operator", nextUrl));
   }
 });
 
