@@ -6,6 +6,14 @@ CLAUDE.md
 # Dependencies
 node_modules/
 
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+api/.env
+
 # Build output
 dist/
 build/
