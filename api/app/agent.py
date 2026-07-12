@@ -31,6 +31,12 @@ FALLBACK_PHONE_MSG = (
     "you shortly."
 )
 
+DEFAULT_OOS_MSG = (
+    "I'm the Sunnyside front desk, so I can help with things like hours, tuition, "
+    "meals, enrollment, and our policies — but that one's outside what I can help "
+    "with. Is there something about the center I can answer?"
+)
+
 # Live-data tool results aren't graph entities, so they carry a `ref` token the
 # model cites instead of an entity id. Each maps to how we show provenance.
 LIVE_SOURCES: dict[str, tuple[str, str]] = {
@@ -82,6 +88,15 @@ def _gap_response(question: str) -> dict:
     r = _base(question, status="escalated", category=None, needs_escalation=True,
               confidence=0.0, citations=[], log=True)
     r.update(kind="assistant-text", answer=FALLBACK_PHONE_MSG, citation=None, source=None, menu=None)
+    return r
+
+
+def _oos_response(question: str, text: str) -> dict:
+    # Out of scope for a daycare front desk (weather, sports, general trivia):
+    # decline politely and DO NOT log — junk must not pollute the operator inbox.
+    r = _base(question, status="answered", category="out_of_scope", needs_escalation=False,
+              confidence=1.0, citations=[], log=False)
+    r.update(kind="assistant-text", answer=text or DEFAULT_OOS_MSG, citation=None, source=None, menu=None)
     return r
 
 
@@ -250,9 +265,11 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
         tools.append(get_my_children)
 
     class Answer(BaseModel):
-        intent: Literal["greeting", "answer", "unknown"] = Field(
+        intent: Literal["greeting", "answer", "unknown", "out_of_scope"] = Field(
             description="greeting = small talk/thanks; answer = a center question you "
-            "answered from the tools; unknown = a center question no tool can answer."
+            "answered from the tools; unknown = a CENTER question no tool can answer "
+            "(a real knowledge gap for staff); out_of_scope = not about this childcare "
+            "center at all (weather, sports, general trivia, unrelated requests)."
         )
         answer: str = Field(description="Reply text: the grounded answer, a warm greeting, or empty if unknown.")
         confidence: float = Field(description="0..1 confidence the answer is correct and grounded.")
@@ -275,16 +292,23 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
         + (", get_my_children (this family's kids/rooms)" if asker_id is not None else "")
         + ". List every source you used in `citations` — entity ids and/or live refs "
         "like 'live:menu'. Set intent='answer'. Be warm, concise, and specific.\n"
-        "- A question no tool can answer: set intent='unknown', answer='', no citations.\n"
+        "- A CENTER question no tool can answer (a real gap for staff to fill): set "
+        "intent='unknown', answer='', no citations.\n"
+        "- A question NOT about this childcare center at all (weather, sports, news, "
+        "general trivia, unrelated requests): set intent='out_of_scope' and write a "
+        "brief, friendly redirect back to what you can help with. No citations.\n"
         "\nGROUNDING — this is critical:\n"
+        "- If the tool results DO address the question, ANSWER it (intent='answer') "
+        "and cite them. Never hand off a question the knowledge base can answer.\n"
         "- Assert ONLY what the tool results explicitly state. Never infer, extrapolate, "
         "guess, or combine facts to fill a gap, and never use outside knowledge.\n"
-        "- If the parent's SPECIFIC question isn't explicitly answered by the tool "
-        "results — even when related information exists — set intent='unknown'. "
-        "Related-but-not-specific is NOT an answer. (E.g. finding a general fee policy "
-        "does not let you confirm a specific discount it never mentions.)\n"
-        "- Answer 'no / we don't offer that' ONLY when a complete, authoritative source "
-        "shows it (e.g. the full program roster). Otherwise set intent='unknown'.\n"
+        "- If the SPECIFIC thing asked isn't in the tool results — even when related "
+        "information exists — set intent='unknown'. Related-but-not-specific is NOT an "
+        "answer. (E.g. a general fee policy doesn't let you confirm a specific discount "
+        "it never mentions.)\n"
+        "- Do NOT assert a negative from absence. If a parent asks whether you offer "
+        "something and the tool results don't mention it, set intent='unknown' (staff "
+        "will confirm) rather than guessing 'no'.\n"
         "Return the structured Answer."
     )
     agent = create_react_agent(
@@ -320,6 +344,8 @@ def _answer_bedrock(db: Session, question: str, asker_id: uuid.UUID | None = Non
     raw = _bedrock_answer(db, question, asker_id)
     if raw["intent"] == "greeting":
         return _greeting_response(question, raw["answer"] or "Hi! How can I help you today?")
+    if raw["intent"] == "out_of_scope":
+        return _oos_response(question, raw["answer"])
     # Trust an 'answer' only if it actually cites a real entity.
     if raw["intent"] == "answer" and raw["citations"] and raw["answer"]:
         return _answer_response(

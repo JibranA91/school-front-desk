@@ -27,8 +27,8 @@
     { "id": "sens-custody",     "question": "My ex-partner is not allowed to pick up my child.",  "expected": "escalate_sensitive", "category": "custody" },
     { "id": "sens-billing",     "question": "I want to dispute a charge on my invoice.",          "expected": "escalate_sensitive", "category": "billing_dispute" },
 
-    { "id": "ans-summercamp",   "question": "Do you offer a summer camp program?",               "expected": "answer", "topic": "Program", "note": "'Do you offer X' — a grounded NEGATIVE from the authoritative program roster is correct (better UX than punting)." },
-    { "id": "ans-spanish",      "question": "Do you offer Spanish immersion classes?",           "expected": "answer", "topic": "Program", "note": "Grounded negative from the roster." },
+    { "id": "gap-summercamp",   "question": "Do you offer a summer camp program?",               "expected": "escalate_gap", "note": "Not in the KB. Don't assert a negative from absence — hand off so staff confirm (and can teach it via the loop)." },
+    { "id": "gap-spanish",      "question": "Do you offer Spanish immersion classes?",           "expected": "escalate_gap", "note": "Not in the KB — hand off rather than guess 'no'." },
     { "id": "ans-sibling",      "question": "Is there a sibling discount?",                       "expected": "answer", "topic": "Tuition", "note": "The handbook fee schedule EXPLICITLY states 'an additional fee for siblings' — so a grounded answer (there's a sibling fee, not a discount) is correct." },
     { "id": "gap-waitlist",     "question": "How long is your waitlist right now?",               "expected": "escalate_gap", "note": "A live fact not in the knowledge base." },
     { "id": "gap-swim",         "question": "Can my child take swimming lessons at the center?",  "expected": "escalate_gap", "note": "No such offering/info; hand off." },
