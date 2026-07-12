@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "bcrypt>=4.2",
+    "langchain-aws>=1.6.2",
 ]
 
 [tool.uv]

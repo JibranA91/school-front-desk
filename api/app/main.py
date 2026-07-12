@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db, init_db
-from app import models
+from app import models, retrieval
 from app.routers import auth as auth_router
 
 
@@ -46,6 +46,12 @@ def center(db: Session = Depends(get_db)) -> dict:
     if not cfg:
         return {}
     return {"name": cfg.name, "phone": cfg.phone, "address": cfg.address, "hours": cfg.hours}
+
+
+@app.get("/search")
+def search(q: str, k: int = 4, db: Session = Depends(get_db)) -> dict:
+    """Debug endpoint for the retrieval layer — hybrid search + 1-hop expansion."""
+    return retrieval.retrieve_subgraph(db, q, k)
 
 
 @app.get("/inbox")

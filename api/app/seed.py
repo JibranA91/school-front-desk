@@ -13,6 +13,7 @@ import bcrypt
 
 from app.db import Base, SessionLocal, engine, init_db
 from app import models
+from app.embeddings import embed_texts, entity_text
 
 DEMO_PASSWORD = "demo1234"
 
@@ -144,6 +145,11 @@ def seed() -> None:
         ]
         db.add_all(entities)
         db.flush()
+
+        # Compute + store embeddings (Titan if creds present, else mock).
+        vectors = embed_texts([entity_text(e) for e in entities])
+        for e, vec in zip(entities, vectors):
+            e.embedding = vec
 
         # --- Relationships ---
         db.add_all(
