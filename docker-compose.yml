@@ -44,6 +44,9 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-dev-web-auth-secret-change-me}
       AUTH_SHARED_SECRET: ${AUTH_SHARED_SECRET:-dev-shared-secret-change-me}
       AUTH_TRUST_HOST: "true"
+      # Canonical base URL for Auth.js callback/redirect resolution (avoids the
+      # standalone server's 0.0.0.0 bind host). Set to the real URL when hosted.
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
     ports:
       - "3000:3000"
     depends_on:

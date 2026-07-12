@@ -31,7 +31,13 @@ export default function SessionBar({ name }: { name: string }) {
           {name}
         </span>
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={async () => {
+            // Clear the session, then navigate on the browser's own origin —
+            // NextAuth's server-computed redirect can resolve to the container
+            // bind host (0.0.0.0) behind the standalone server.
+            await signOut({ redirect: false });
+            window.location.href = "/login";
+          }}
           className="fd-ghost"
           style={{
             border: "1px solid #EBEFF4",
