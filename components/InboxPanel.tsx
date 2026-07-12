@@ -16,12 +16,44 @@ import {
   type Thread,
 } from "@/lib/frontDesk";
 
-const PRIORITY: Record<InboxItem["status"], number> = {
-  escalated: 0,
-  lowconf: 1,
-  answered: 2,
-  resolved: 3,
+type Tone = "amber" | "green" | "indigo";
+const TONES: Record<Tone, { bg: string; fg: string; dot: string }> = {
+  amber: { bg: "#FFF7ED", fg: "#B5710A", dot: "#FF9D17" },
+  green: { bg: "#E7F7EE", fg: "#227A47", dot: "#3BBA6E" },
+  indigo: { bg: "#EEF1FF", fg: "#4B57B8", dot: "#5463D6" },
 };
+
+/** Group key for dedup: the stored group_key, or a fallback derived from the
+ *  question text (mirrors the backend) so older inquiries without one still
+ *  collapse. */
+function groupKeyOf(it: InboxItem): string {
+  if (it.group_key) return it.group_key;
+  const words = (it.text.toLowerCase().match(/[a-z0-9]+/g) ?? []).slice(0, 8);
+  return words.join(" ");
+}
+
+/** Collapse duplicate questions into one row + a count. Input is assumed
+ *  newest-first, so the kept row is the most recent occurrence. */
+function collapse(items: InboxItem[]): { item: InboxItem; count: number }[] {
+  const byKey = new Map<string, { item: InboxItem; count: number }>();
+  const out: { item: InboxItem; count: number }[] = [];
+  for (const it of items) {
+    const key = groupKeyOf(it);
+    if (!key) {
+      out.push({ item: it, count: 1 });
+      continue;
+    }
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      const entry = { item: it, count: 1 };
+      byKey.set(key, entry);
+      out.push(entry);
+    }
+  }
+  return out;
+}
 
 const SENSITIVE = new Set([
   "health",
@@ -41,6 +73,192 @@ function timeAgo(iso: string | null): string {
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `${hrs} hr ago`;
   return `${Math.round(hrs / 24)} d ago`;
+}
+
+function StatChip({ label, value, tone }: { label: string; value: number; tone: Tone }) {
+  const t = TONES[tone];
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: t.bg,
+        borderRadius: 12,
+        padding: "9px 14px",
+      }}
+    >
+      <span style={{ fontSize: 20, fontWeight: 800, color: t.fg, lineHeight: 1 }}>
+        {value}
+      </span>
+      <span style={{ fontSize: "12.5px", fontWeight: 600, color: t.fg }}>{label}</span>
+    </div>
+  );
+}
+
+function InboxRow({
+  item,
+  count,
+  dim,
+  onClick,
+}: {
+  item: InboxItem;
+  count: number;
+  dim?: boolean;
+  onClick: () => void;
+}) {
+  const s = statusStyles[item.status];
+  return (
+    <div
+      className="fd-inbox-row"
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        padding: "15px 18px",
+        borderBottom: "1px solid #F0F3F8",
+        cursor: "pointer",
+        transition: "background .12s",
+        opacity: dim ? 0.65 : 1,
+      }}
+    >
+      <span
+        style={{
+          background: s.bg,
+          color: s.color,
+          padding: "5px 11px",
+          borderRadius: 999,
+          fontSize: 12,
+          fontWeight: 700,
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+      >
+        {s.label}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "#18181D" }}>{item.text}</div>
+        <div style={{ fontSize: "12.5px", color: "#737685", marginTop: 3 }}>
+          {item.who} · {timeAgo(item.created_at)}
+        </div>
+      </div>
+      {count > 1 && (
+        <span
+          style={{
+            background: "#FFF1DE",
+            color: "#B5710A",
+            fontSize: 11,
+            fontWeight: 800,
+            padding: "3px 9px",
+            borderRadius: 999,
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          {count} asked
+        </span>
+      )}
+      <svg
+        width="17"
+        height="17"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#C4C8D4"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ flexShrink: 0 }}
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </div>
+  );
+}
+
+function InboxSection({
+  title,
+  tone,
+  rows,
+  onOpen,
+  emptyText,
+  dim,
+}: {
+  title: string;
+  tone: Tone;
+  rows: { item: InboxItem; count: number }[];
+  onOpen: (i: InboxItem) => void;
+  emptyText?: string;
+  dim?: boolean;
+}) {
+  const t = TONES[tone];
+  if (!rows.length && !emptyText) return null;
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span
+          style={{ width: 8, height: 8, borderRadius: 999, background: t.dot, display: "inline-block" }}
+        />
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: ".05em",
+            textTransform: "uppercase",
+            color: "#737685",
+          }}
+        >
+          {title}
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: t.fg,
+            background: t.bg,
+            borderRadius: 999,
+            padding: "1px 9px",
+          }}
+        >
+          {rows.length}
+        </span>
+      </div>
+      {rows.length ? (
+        <div
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid #EBEFF4",
+            borderRadius: 16,
+            overflow: "hidden",
+            boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
+          }}
+        >
+          {rows.map(({ item, count }) => (
+            <InboxRow
+              key={item.id}
+              item={item}
+              count={count}
+              dim={dim}
+              onClick={() => onOpen(item)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          style={{
+            background: "#FFFFFF",
+            border: "1px dashed #E4E8F1",
+            borderRadius: 16,
+            padding: 18,
+            fontSize: "13.5px",
+            color: "#737685",
+          }}
+        >
+          {emptyText}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TranscriptBubble({ m }: { m: Msg }) {
@@ -134,34 +352,31 @@ export default function InboxPanel({
     return () => clearInterval(poll);
   }, []);
 
-  // Sort by priority, then recency; collapse open gaps that share a group_key.
-  const visible = useMemo(() => {
+  // Split into what needs the operator vs. what the AI already handled vs.
+  // resolved, newest-first, collapsing duplicate questions within each.
+  const groups = useMemo(() => {
     const sorted = [...items].sort(
-      (a, b) =>
-        PRIORITY[a.status] - PRIORITY[b.status] ||
-        (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+      (a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""),
     );
-    const seen = new Set<string>();
-    const out: InboxItem[] = [];
+    const attention: InboxItem[] = [];
+    const answered: InboxItem[] = [];
+    const resolved: InboxItem[] = [];
     for (const it of sorted) {
-      const openGap = it.status === "escalated" || it.status === "lowconf";
-      if (openGap && it.group_key) {
-        if (seen.has(it.group_key)) continue;
-        seen.add(it.group_key);
-      }
-      out.push(it);
+      if (it.status === "escalated" || it.status === "lowconf") attention.push(it);
+      else if (it.status === "resolved") resolved.push(it);
+      else answered.push(it);
     }
-    return out;
+    return {
+      attention: collapse(attention),
+      answered: collapse(answered),
+      resolved: collapse(resolved),
+    };
   }, [items]);
 
-  const openCount = useMemo(
-    () => visible.filter((i) => i.status === "escalated" || i.status === "lowconf").length,
-    [visible],
-  );
-
+  const attentionCount = groups.attention.length;
   useEffect(() => {
-    onOpenCount?.(openCount);
-  }, [openCount, onOpenCount]);
+    onOpenCount?.(attentionCount);
+  }, [attentionCount, onOpenCount]);
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
@@ -251,104 +466,46 @@ export default function InboxPanel({
             Inbox
           </div>
           <div style={{ fontSize: 14, color: "#5C5E6A", marginTop: 4 }}>
-            Every question parents asked — newest first. {openCount} need your
-            attention. Answer a gap once and it&apos;s folded into the knowledge
-            base for the next parent.
+            Escalations and knowledge gaps need you; everything else the AI
+            already handled. Answer a gap once and it&apos;s folded into the
+            knowledge base for the next parent.
           </div>
 
-          <div
-            style={{
-              marginTop: 22,
-              background: "#FFFFFF",
-              border: "1px solid #EBEFF4",
-              borderRadius: 16,
-              overflow: "hidden",
-              boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
-            }}
-          >
-            {loading && (
-              <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
-                Loading inbox…
-              </div>
-            )}
-            {!loading && visible.length === 0 && (
-              <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
-                No questions yet.
-              </div>
-            )}
-            {visible.map((i) => {
-              const s = statusStyles[i.status];
-              return (
-                <div
-                  key={i.id}
-                  className="fd-inbox-row"
-                  onClick={() => openDetail(i)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
-                    padding: "16px 18px",
-                    borderBottom: "1px solid #F0F3F8",
-                    cursor: "pointer",
-                    transition: "background .12s",
-                    opacity: i.status === "resolved" ? 0.6 : 1,
-                  }}
-                >
-                  <span
-                    style={{
-                      background: s.bg,
-                      color: s.color,
-                      padding: "5px 11px",
-                      borderRadius: 999,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {s.label}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "#18181D" }}>
-                      {i.text}
-                    </div>
-                    <div style={{ fontSize: "12.5px", color: "#737685", marginTop: 3 }}>
-                      {i.who} · {timeAgo(i.created_at)}
-                    </div>
-                  </div>
-                  {i.group_count > 1 && (
-                    <span
-                      style={{
-                        background: "#FFF1DE",
-                        color: "#B5710A",
-                        fontSize: 11,
-                        fontWeight: 800,
-                        padding: "3px 9px",
-                        borderRadius: 999,
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {i.group_count} asked
-                    </span>
-                  )}
-                  <svg
-                    width="17"
-                    height="17"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#C4C8D4"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flexShrink: 0 }}
-                  >
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
-                </div>
-              );
-            })}
+          {/* At-a-glance stats */}
+          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+            <StatChip label="Need attention" value={attentionCount} tone="amber" />
+            <StatChip label="Auto-answered" value={groups.answered.length} tone="green" />
+            <StatChip label="Resolved" value={groups.resolved.length} tone="indigo" />
           </div>
+
+          {loading ? (
+            <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
+              Loading inbox…
+            </div>
+          ) : (
+            <>
+              <InboxSection
+                title="Needs your attention"
+                tone="amber"
+                rows={groups.attention}
+                onOpen={openDetail}
+                emptyText="You're all caught up — nothing waiting on you."
+              />
+              <InboxSection
+                title="Answered by the AI"
+                tone="green"
+                rows={groups.answered}
+                onOpen={openDetail}
+              />
+              <InboxSection
+                title="Resolved"
+                tone="indigo"
+                rows={groups.resolved}
+                onOpen={openDetail}
+                dim
+              />
+            </>
+          )}
         </>
       ) : (
         <InquiryDetail
