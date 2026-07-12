@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.db import get_db, init_db
-from app import agent, models, retrieval
+from app import agent, authoring, models, retrieval
 from app.routers import auth as auth_router
 
 
@@ -95,6 +95,65 @@ def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
         result["inquiry_id"] = str(inquiry.id)
 
     return result
+
+
+class AuthorProposeRequest(BaseModel):
+    instruction: str
+
+
+class AuthorApplyRequest(BaseModel):
+    changes: list[dict]
+    summary: str | None = None
+    accept_conflicts: bool = True
+    actor: str = "Operator"
+    actor_user_id: str | None = None
+
+
+@app.post("/author/propose")
+def author_propose(body: AuthorProposeRequest, db: Session = Depends(get_db)) -> dict:
+    """Operator instruction → proposed graph changes + conflict detection (no write)."""
+    return authoring.propose(db, body.instruction)
+
+
+@app.post("/author/apply")
+def author_apply(body: AuthorApplyRequest, db: Session = Depends(get_db)) -> dict:
+    """Apply confirmed changes to the graph + changelog."""
+    return authoring.apply(
+        db,
+        body.changes,
+        actor=body.actor,
+        summary=body.summary,
+        actor_user_id=_as_uuid(body.actor_user_id),
+        accept_conflicts=body.accept_conflicts,
+    )
+
+
+@app.get("/changelog")
+def changelog(db: Session = Depends(get_db)) -> list[dict]:
+    rows = db.scalars(
+        select(models.ChangelogEntry).order_by(models.ChangelogEntry.created_at.desc())
+    ).all()
+    out = []
+    for c in rows:
+        initials = "".join(w[0] for w in c.actor.split()[:2]).upper() or "?"
+        color = (
+            "#5463D6" if c.actor_user_id else ("#29B9BB" if c.actor == "AI Front Desk" else "#737685")
+        )
+        out.append(
+            {
+                "who": c.actor,
+                "when": c.created_at.strftime("%b %d · %I:%M %p").replace(" 0", " ")
+                if c.created_at
+                else "",
+                "what": c.action,
+                "before": c.before,
+                "after": c.after,
+                "isDiff": c.is_diff,
+                "initials": initials,
+                "color": color,
+            }
+        )
+    return out
 
 
 @app.get("/inbox")
