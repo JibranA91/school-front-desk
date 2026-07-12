@@ -107,24 +107,22 @@ def _sensitive_response(db: Session, question: str, category: str) -> dict:
 
 
 def _answer_response(db, question, answer, citation, source, citations, confidence) -> dict:
-    top_id = citations[0] if citations else None
-    menu_wanted = (
-        "live:menu" in (citations or [])
-        or top_id == "meals"
-        or any(w in question.lower() for w in ["lunch", "menu", "today's food"])
-    )
-    if menu_wanted:
+    # Show the menu card ONLY when the answer is genuinely grounded in today's
+    # menu — i.e. the agent actually called the live menu tool. We render the
+    # model's own grounded answer, never a canned string, and never trigger on a
+    # bare keyword like "lunch" (which used to hijack e.g. "can my child bring
+    # fish for lunch?").
+    if "live:menu" in (citations or []):
         menu = todays_menu(db)
         if menu:
             r = _base(question, status="answered", category=None, needs_escalation=False,
                       confidence=confidence, citations=citations, log=True)
             r.update(
                 kind="lunch",
-                answer="Yes — a fresh lunch is served every day and it's included in "
-                "tuition. Here's what's on today's tray:",
+                answer=answer,
                 menu=menu,
-                citation="per Today’s Menu",
-                source="Today's Menu · synced from the kitchen this morning.",
+                citation=citation or "per Today’s Menu",
+                source=source or "Today's Menu · synced from the kitchen this morning.",
             )
             return r
     r = _base(question, status="answered", category=None, needs_escalation=False,
