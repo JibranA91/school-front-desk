@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+api
+.venv
+.plans
+.claude
+*.md
+.env
+.env.*
+Dockerfile
+.dockerignore
+npm-debug.log*

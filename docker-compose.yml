@@ -30,5 +30,21 @@ services:
       db:
         condition: service_healthy
 
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Server-side calls (Auth.js authorize, server components) use the
+      # compose service name; the browser doesn't call the API directly yet.
+      API_BASE_URL: http://api:8000
+      AUTH_SECRET: ${AUTH_SECRET:-dev-web-auth-secret-change-me}
+      AUTH_SHARED_SECRET: ${AUTH_SHARED_SECRET:-dev-shared-secret-change-me}
+      AUTH_TRUST_HOST: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
 volumes:
   pgdata:
