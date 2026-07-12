@@ -57,9 +57,10 @@ def center(db: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/search")
-def search(q: str, k: int = 4, db: Session = Depends(get_db)) -> dict:
-    """Debug endpoint for the retrieval layer — hybrid search + 1-hop expansion."""
-    return retrieval.retrieve_subgraph(db, q, k)
+def search(q: str, k: int = 4) -> dict:
+    """Debug endpoint for the retrieval layer — hybrid search + 1-hop expansion.
+    Goes through the configured Retriever, not the DB directly."""
+    return retrieval.get_retriever().retrieve_subgraph(q, k)
 
 
 class AskRequest(BaseModel):

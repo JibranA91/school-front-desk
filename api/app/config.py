@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # CORS — the web origin allowed to call this API.
     web_origin: str = "http://localhost:3000"
 
+    # Which retrieval backend the agent reads through. Swap this to point the
+    # knowledge base at a different store behind the same Retriever interface.
+    retriever: str = "pgvector"
+
     @property
     def bedrock_enabled(self) -> bool:
         if self.use_bedrock is not None:

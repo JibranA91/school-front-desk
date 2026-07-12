@@ -108,11 +108,11 @@ def _oos_response(question: str, text: str) -> dict:
 _SENSITIVE_RELATED: dict[str, str] = {"health": "policy-illness"}
 
 
-def _sensitive_response(db: Session, question: str, category: str) -> dict:
+def _sensitive_response(question: str, category: str) -> dict:
     related = ""
     entity_id = _SENSITIVE_RELATED.get(category)
     if entity_id:
-        pol = retrieval.get_entity(db, entity_id)
+        pol = retrieval.get_retriever().get_entity(entity_id)
         body = (pol.get("attributes") or {}).get("body") if pol else None
         if isinstance(body, str) and body:
             related = f" While you wait, here's our related policy — {pol['name']}: {body}"
@@ -156,13 +156,13 @@ def _answer_response(db, question, answer, citation, source, citations, confiden
     return r
 
 
-def _citation_details(db: Session, citations: list[str]) -> tuple[str | None, str | None]:
+def _citation_details(citations: list[str]) -> tuple[str | None, str | None]:
     if not citations:
         return None, None
     top = citations[0]
     if top in LIVE_SOURCES:  # live-data source, not a graph entity
         return LIVE_SOURCES[top]
-    e = retrieval.get_entity(db, top)
+    e = retrieval.get_retriever().get_entity(top)
     if not e:
         return None, None
     srcs = e.get("sources") or []
@@ -182,20 +182,23 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
     from app.llm import get_chat_model
 
     # --- Knowledge-graph tools (the stored source of truth) ---
+    # Read through the configured Retriever — the agent never touches the store.
+    kb = retrieval.get_retriever()
+
     @tool
     def search_graph(query: str) -> list[dict]:
         """Search the center's knowledge graph for entities relevant to a query."""
-        return retrieval.search_graph(db, query, k=5)
+        return kb.search(query, k=5)
 
     @tool
     def get_entity(entity_id: str) -> dict | None:
         """Fetch a single knowledge-graph entity by its id."""
-        return retrieval.get_entity(db, entity_id)
+        return kb.get_entity(entity_id)
 
     @tool
     def expand_neighbors(entity_id: str) -> list[dict]:
         """Get entities directly related (1 hop) to the given entity."""
-        return retrieval.expand_neighbors(db, entity_id)
+        return kb.expand_neighbors(entity_id)
 
     # --- Live-data tools (query the database directly, not the graph) ---
     @tool
@@ -322,8 +325,8 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
     result = agent.invoke({"messages": [{"role": "user", "content": question}]})
     s: Answer = result["structured_response"]
     # A citation is valid if it's a real entity or a known live-data ref.
-    valid = [c for c in s.citations if c in LIVE_SOURCES or retrieval.get_entity(db, c)]
-    citation, source = _citation_details(db, valid)
+    valid = [c for c in s.citations if c in LIVE_SOURCES or kb.get_entity(c)]
+    citation, source = _citation_details(valid)
     return {
         "intent": s.intent,
         "answer": s.answer,
@@ -339,7 +342,7 @@ def _answer_bedrock(db: Session, question: str, asker_id: uuid.UUID | None = Non
     # without depending on (or paying for) the model.
     sensitive = escalation.classify_sensitive(question)
     if sensitive is not None:
-        return _sensitive_response(db, question, sensitive)
+        return _sensitive_response(question, sensitive)
 
     raw = _bedrock_answer(db, question, asker_id)
     if raw["intent"] == "greeting":
@@ -412,8 +415,8 @@ def _format_from_entity(e: dict) -> tuple[str, str, str]:
     return (f"{e['name']} — {facts}", citation, source_text)
 
 
-def _mock_answer(db: Session, question: str) -> dict:
-    sub = retrieval.retrieve_subgraph(db, question, k=4)
+def _mock_answer(question: str) -> dict:
+    sub = retrieval.get_retriever().retrieve_subgraph(question, k=4)
     hits = sub["hits"]
     top = hits[0] if hits else None
     confidence = 0.0
@@ -437,11 +440,11 @@ def _mock_answer(db: Session, question: str) -> dict:
 def _answer_mock(db: Session, question: str) -> dict:
     sensitive = escalation.classify_sensitive(question)
     if sensitive is not None:
-        return _sensitive_response(db, question, sensitive)
+        return _sensitive_response(question, sensitive)
     social = _social_reply(question)
     if social is not None:
         return _greeting_response(question, social)
-    raw = _mock_answer(db, question)
+    raw = _mock_answer(question)
     decision = escalation.decide(question, raw["confidence"], raw["citations"])
     if decision.needs_escalation:
         return _gap_response(question)

@@ -12,11 +12,16 @@ against entities that don't mention them — no manual stopword list needed.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from sqlalchemy import Text, func, or_, select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.config import settings
+from app.db import SessionLocal
 from app.embeddings import embed_query
+from app.retrieval_base import EntitySummary, Retriever
 
 # Hybrid weights: semantic recall + lexical precision on named entities.
 W_SEMANTIC = 0.65
@@ -118,3 +123,46 @@ def retrieve_subgraph(db: Session, query: str, k: int = 4, expand: bool = True) 
             for n in expand_neighbors(db, h["id"]):
                 subgraph.setdefault(n["id"], n)
     return {"query": query, "hits": hits, "entities": list(subgraph.values())}
+
+
+# --------------------------------------------------------------------------- #
+# Retriever implementation + factory (the swap seam)
+# --------------------------------------------------------------------------- #
+
+
+class PgVectorRetriever:
+    """Default `Retriever`: Postgres + pgvector (semantic) + FTS (lexical) +
+    kb_relationships (structural). Opens its own short-lived read session per
+    call, so the interface stays connection-agnostic. Delegates to the module
+    functions above."""
+
+    def search(self, query: str, k: int = 5) -> list[EntitySummary]:
+        with SessionLocal() as db:
+            return search_graph(db, query, k)
+
+    def get_entity(self, entity_id: str) -> EntitySummary | None:
+        with SessionLocal() as db:
+            return get_entity(db, entity_id)
+
+    def expand_neighbors(self, entity_id: str, rel: str | None = None) -> list[EntitySummary]:
+        with SessionLocal() as db:
+            return expand_neighbors(db, entity_id, rel)
+
+    def retrieve_subgraph(self, query: str, k: int = 4, expand: bool = True) -> dict:
+        with SessionLocal() as db:
+            return retrieve_subgraph(db, query, k, expand)
+
+
+_BACKENDS = {"pgvector": PgVectorRetriever}
+
+
+@lru_cache(maxsize=1)
+def get_retriever() -> Retriever:
+    """The configured knowledge-base retriever. Swap `settings.retriever` (or
+    register another class in `_BACKENDS`) to change stores — nothing else moves."""
+    backend = _BACKENDS.get(settings.retriever)
+    if backend is None:
+        raise ValueError(
+            f"Unknown retriever {settings.retriever!r}; options: {sorted(_BACKENDS)}"
+        )
+    return backend()
