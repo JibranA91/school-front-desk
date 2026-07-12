@@ -34,6 +34,35 @@ def group_key(text: str) -> str:
     return " ".join(words[:8])
 
 
+_GREETING_WORDS = {"hi", "hello", "hey", "yo", "hiya", "howdy", "greetings", "hullo", "heya"}
+
+
+def _social_reply(text: str) -> str | None:
+    """A friendly reply for greetings / thanks / goodbyes — so small talk isn't
+    treated as an unanswerable center question. None → route to the knowledge agent."""
+    words = re.findall(r"[a-z']+", text.lower())
+    if not words:
+        return "Hi! I'm Sunny, the Sunnyside front desk. What can I help you with?"
+    if len(words) > 5:  # long enough to carry a real question — let the agent handle it
+        return None
+    joined = " ".join(words)
+    if "thank" in joined or joined in {"thanks", "thx", "ty", "cheers"}:
+        return "You're very welcome! Is there anything else I can help you with?"
+    if "bye" in words or "goodbye" in words or "see you" in joined or "good night" in joined:
+        return "Take care! You can reach the front desk anytime you have a question."
+    is_greeting = (
+        words[0] in _GREETING_WORDS
+        or any(p in joined for p in ("good morning", "good afternoon", "good evening"))
+        or "how are you" in joined
+    )
+    if is_greeting:
+        return (
+            "Hi! I'm Sunny, the Sunnyside front desk. I can help with hours, tuition, "
+            "meals, our illness policy, tours, and more — what would you like to know?"
+        )
+    return None
+
+
 def todays_menu(db: Session) -> list[str] | None:
     row = db.scalar(select(models.MenuDay).where(models.MenuDay.day == date.today()))
     if row is None:  # fall back to the most recent day so the demo isn't date-fragile
@@ -169,6 +198,25 @@ def answer_question(db: Session, question: str) -> dict:
 
     Returns a shape the frontend can render directly (see the message `kind`s).
     """
+    # Small talk short-circuits before the knowledge pipeline — no escalation,
+    # no inbox gap ("log": False).
+    social = _social_reply(question)
+    if social is not None:
+        return {
+            "kind": "assistant-text",
+            "answer": social,
+            "citation": None,
+            "source": None,
+            "menu": None,
+            "citations": [],
+            "confidence": 1.0,
+            "category": "social",
+            "needs_escalation": False,
+            "status": "answered",
+            "group_key": group_key(question),
+            "log": False,
+        }
+
     raw = _bedrock_answer(db, question) if settings.bedrock_enabled else _mock_answer(db, question)
     decision = escalation.decide(question, raw["confidence"], raw["citations"])
 

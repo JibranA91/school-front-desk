@@ -79,19 +79,21 @@ def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
     inbox, and returns a renderable answer."""
     result = agent.answer_question(db, body.question)
 
-    inquiry = models.Inquiry(
-        asker_id=_as_uuid(body.asker_id),
-        child_id=_as_uuid(body.child_id),
-        text=body.question,
-        status=result["status"],
-        category=result.get("category"),
-        confidence=result.get("confidence"),
-        group_key=result.get("group_key"),
-    )
-    db.add(inquiry)
-    db.commit()
+    # Small talk (greetings, thanks) isn't a question the operator needs to see.
+    if result.get("log", True):
+        inquiry = models.Inquiry(
+            asker_id=_as_uuid(body.asker_id),
+            child_id=_as_uuid(body.child_id),
+            text=body.question,
+            status=result["status"],
+            category=result.get("category"),
+            confidence=result.get("confidence"),
+            group_key=result.get("group_key"),
+        )
+        db.add(inquiry)
+        db.commit()
+        result["inquiry_id"] = str(inquiry.id)
 
-    result["inquiry_id"] = str(inquiry.id)
     return result
 
 
