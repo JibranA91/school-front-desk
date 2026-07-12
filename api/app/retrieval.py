@@ -16,6 +16,17 @@ from app.embeddings import embed_query, tokens
 W_SEMANTIC = 0.65
 W_LEXICAL = 0.35
 
+# Common words that would otherwise create false lexical matches (e.g. "do you
+# have a swimming pool" matching a policy body just because it contains "have").
+STOPWORDS = {
+    "the", "a", "an", "is", "are", "am", "be", "been", "do", "does", "did", "you",
+    "your", "yours", "i", "my", "we", "our", "it", "its", "he", "she", "they", "them",
+    "have", "has", "had", "can", "could", "will", "would", "should", "of", "to", "on",
+    "in", "for", "and", "or", "at", "by", "with", "from", "this", "that", "these",
+    "those", "what", "when", "where", "how", "why", "who", "which", "if", "so", "as",
+    "get", "got", "there", "here", "about", "any", "some", "me", "us",
+}
+
 
 def _summary(e: models.KbEntity) -> dict:
     attrs = e.attributes or {}
@@ -30,13 +41,19 @@ def _summary(e: models.KbEntity) -> dict:
     }
 
 
+def _stem(t: str) -> str:
+    # Very light singularization so tour/tours, morning/mornings match.
+    return t[:-1] if len(t) > 3 and t.endswith("s") else t
+
+
 def _lexical_score(query_tokens: set[str], e: models.KbEntity) -> float:
-    if not query_tokens:
+    meaningful = {_stem(t) for t in (query_tokens - STOPWORDS)}
+    if not meaningful:
         return 0.0
     text = e.name + " " + " ".join(str(v) for v in (e.attributes or {}).values())
-    entity_tokens = set(tokens(text))
-    hits = sum(1 for q in query_tokens if q in entity_tokens)
-    return hits / len(query_tokens)
+    entity_tokens = {_stem(t) for t in tokens(text)}
+    hits = sum(1 for q in meaningful if q in entity_tokens)
+    return hits / len(meaningful)
 
 
 def search_graph(db: Session, query: str, k: int = 5) -> list[dict]:
