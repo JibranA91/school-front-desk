@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { answerFor, chips, seedMessages, type Msg } from "@/lib/frontDesk";
+import { askFrontDesk, chips, resultToMessage, type Msg } from "@/lib/frontDesk";
 
 export default function ParentView() {
-  const [messages, setMessages] = useState<Msg[]>(seedMessages);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [openSources, setOpenSources] = useState<number[]>([]);
@@ -20,18 +20,29 @@ export default function ParentView() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const t = (text || "").trim();
     if (!t) return;
     const uid = Date.now();
     setMessages((s) => [...s, { id: uid, type: "user", text: t }]);
     setChatInput("");
     setTyping(true);
-    setTimeout(() => {
-      const ans = answerFor(t);
-      setMessages((s) => [...s, { ...ans, id: uid + 1 }]);
+    try {
+      const result = await askFrontDesk(t);
+      setMessages((s) => [...s, resultToMessage(uid + 1, result)]);
+    } catch {
+      setMessages((s) => [
+        ...s,
+        {
+          id: uid + 1,
+          type: "assistant-text",
+          text:
+            "Sorry — I couldn't reach the front desk just now. Please try again in a moment.",
+        },
+      ]);
+    } finally {
       setTyping(false);
-    }, 800);
+    }
   };
 
   return (

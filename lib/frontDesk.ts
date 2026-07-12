@@ -1,7 +1,6 @@
-// Mock front-desk logic + seed data.
-// NOTE: this is the demo stand-in for the real agents. The `answerFor` keyword
-// router here will be replaced by `POST /api/ask` (Bedrock) per .plans/spec.md;
-// the operator seed data will come from the server-side knowledge graph.
+// Front-desk types + client calls.
+// Parent chat now calls the real backend (`/api/ask` → FastAPI → agent).
+// The operator seed data below is still mock — wired to the DB in a later step.
 
 export type MsgType =
   | "user"
@@ -27,106 +26,43 @@ export const chips: { label: string; q: string }[] = [
   { label: "My child has a fever", q: "My child has a fever" },
 ];
 
-export const seedMessages: Msg[] = [
-  { id: 2, type: "user", text: "What are your hours?" },
-  {
-    id: 3,
-    type: "confident",
-    answer:
-      "We're open Monday through Friday, 7:00 AM to 6:00 PM. We're closed on weekends and major holidays.",
-    citation: "per our Hours & Schedule",
-    source:
-      "Hours & Schedule · Open Mon–Fri, 7:00 AM–6:00 PM. Closed weekends & major holidays. Reviewed by Maria Chen on Oct 15, 2025.",
-  },
-  { id: 4, type: "user", text: "My child has a fever" },
-  {
-    id: 5,
-    type: "escalation",
-    answer:
-      "I want to make sure you get the right guidance on this — I've flagged it for our staff, who'll reach out shortly. While you wait: our policy asks that children with a fever of 100.4°F or higher stay home until they've been fever-free for 24 hours.",
-  },
-  { id: 6, type: "user", text: "Is lunch provided today?" },
-  {
-    id: 7,
-    type: "lunch",
-    answer:
-      "Yes — a fresh lunch is served every day and it's included in tuition. Here's what's on today's tray:",
-    menu: ["Turkey & cheese sandwich", "Crisp apple slices", "Whole milk"],
-    citation: "per Today’s Menu",
-    source: "Today's Menu · Synced from the kitchen at 6:30 AM today.",
-  },
-];
+/** The structured answer returned by the agent (via /api/ask). */
+export interface AskResult {
+  kind: MsgType;
+  answer: string;
+  citation?: string | null;
+  source?: string | null;
+  menu?: string[] | null;
+  category?: string | null;
+  needs_escalation?: boolean;
+}
 
-export function answerFor(text: string): Omit<Msg, "id"> {
-  const t = text.toLowerCase();
-  if (t.includes("fever") || t.includes("sick") || t.includes("temperature")) {
-    return {
-      type: "escalation",
-      answer:
-        "I want to make sure you get the right guidance on this — I've flagged it for our staff, who'll reach out shortly. While you wait: our policy asks that children with a fever of 100.4°F or higher stay home until they've been fever-free for 24 hours.",
-    };
-  }
-  if (
-    t.includes("tuition") ||
-    t.includes("cost") ||
-    t.includes("price") ||
-    t.includes("how much")
-  ) {
-    return {
-      type: "confident",
-      answer:
-        "Infant tuition is $1,600 per month. That includes daily meals, diapers, and wipes — there are no separate supply fees.",
-      citation: "per Tuition & Fees",
-      source:
-        "Tuition & Fees · Infant $1,600/mo, includes meals & supplies. Reviewed by Maria Chen on Oct 15, 2025.",
-    };
-  }
-  if (
-    t.includes("lunch") ||
-    t.includes("menu") ||
-    t.includes("food") ||
-    t.includes("eat")
-  ) {
-    return {
-      type: "lunch",
-      answer:
-        "Yes — a fresh lunch is served every day and it's included in tuition. Here's what's on today's tray:",
-      menu: ["Turkey & cheese sandwich", "Crisp apple slices", "Whole milk"],
-      citation: "per Today’s Menu",
-      source: "Today's Menu · Synced from the kitchen at 6:30 AM today.",
-    };
-  }
-  if (
-    t.includes("hour") ||
-    t.includes("open") ||
-    t.includes("close") ||
-    t.includes("time")
-  ) {
-    return {
-      type: "confident",
-      answer:
-        "We're open Monday through Friday, 7:00 AM to 6:00 PM. We're closed on weekends and major holidays.",
-      citation: "per our Hours & Schedule",
-      source:
-        "Hours & Schedule · Open Mon–Fri, 7:00 AM–6:00 PM. Closed weekends & major holidays. Reviewed Oct 15, 2025.",
-    };
-  }
-  if (t.includes("tour") || t.includes("visit")) {
-    return {
-      type: "confident",
-      answer:
-        "We'd love to show you around! Tours run Tuesday and Thursday mornings, and you can book one online in about a minute.",
-      citation: "per Visits & Tours",
-      source: "Visits & Tours · Offered Tue/Thu mornings, booked online.",
-    };
+export async function askFrontDesk(question: string): Promise<AskResult> {
+  const res = await fetch("/api/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok) throw new Error(`ask failed: ${res.status}`);
+  return res.json();
+}
+
+/** Map an AskResult into a chat Msg the UI can render. */
+export function resultToMessage(id: number, r: AskResult): Msg {
+  if (r.kind === "assistant-text") {
+    return { id, type: "assistant-text", text: r.answer };
   }
   return {
-    type: "assistant-text",
-    text: "That's a great question — I want to be sure I give you the right answer, so I've passed it to our staff. Someone from Sunnyside will follow up with you shortly.",
+    id,
+    type: r.kind,
+    answer: r.answer,
+    citation: r.citation ?? undefined,
+    source: r.source ?? undefined,
+    menu: r.menu ?? undefined,
   };
 }
 
-// ---- Operator seed data ----
+// ---- Operator seed data (still mock; wired to the DB later) ----
 
 export type InboxStatus = "answered" | "escalated" | "lowconf";
 
