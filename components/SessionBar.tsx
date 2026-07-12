@@ -1,31 +1,8 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import Link from "next/link";
-import type { CSSProperties } from "react";
 
-function pill(active: boolean): CSSProperties {
-  return {
-    padding: "7px 16px",
-    borderRadius: 999,
-    fontSize: 13,
-    fontWeight: 700,
-    textDecoration: "none",
-    background: active ? "#5463D6" : "transparent",
-    color: active ? "#FFFFFF" : "#5C5E6A",
-    transition: "all .15s",
-  };
-}
-
-export default function SessionBar({
-  name,
-  role,
-  active,
-}: {
-  name: string;
-  role?: string;
-  active: "parent" | "operator";
-}) {
+export default function SessionBar({ name }: { name: string }) {
   return (
     <div
       style={{
@@ -38,28 +15,6 @@ export default function SessionBar({
         alignItems: "center",
       }}
     >
-      {/* Operators can preview the parent front desk; parents cannot. */}
-      {role === "operator" && (
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            padding: 4,
-            background: "#FFFFFF",
-            border: "1px solid #EBEFF4",
-            borderRadius: 999,
-            boxShadow: "0 6px 22px rgba(24,24,29,.08)",
-          }}
-        >
-          <Link href="/" style={pill(active === "parent")}>
-            Parent
-          </Link>
-          <Link href="/operator" style={pill(active === "operator")}>
-            Operator
-          </Link>
-        </div>
-      )}
-
       <div
         style={{
           display: "flex",

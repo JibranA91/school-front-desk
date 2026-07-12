@@ -7,7 +7,8 @@ export type MsgType =
   | "assistant-text"
   | "confident"
   | "escalation"
-  | "lunch";
+  | "lunch"
+  | "staff";
 
 export interface Msg {
   id: number;
@@ -17,6 +18,14 @@ export interface Msg {
   citation?: string;
   source?: string;
   menu?: string[];
+  by?: string; // for staff replies: who sent it
+}
+
+/** The parent's own persisted transcript (includes staff replies). */
+export async function fetchHistory(): Promise<Msg[]> {
+  const res = await fetch("/api/history", { cache: "no-store" });
+  if (!res.ok) throw new Error(`history failed: ${res.status}`);
+  return res.json();
 }
 
 export const chips: { label: string; q: string }[] = [
@@ -157,6 +166,37 @@ export interface KnowledgeGraph {
 export async function fetchGraph(): Promise<KnowledgeGraph> {
   const res = await fetch("/api/graph", { cache: "no-store" });
   if (!res.ok) throw new Error(`graph failed: ${res.status}`);
+  return res.json();
+}
+
+// ---- Operator: read a parent's thread + reply directly (no graph write) ----
+
+export interface Thread {
+  who: string;
+  can_reply: boolean;
+  messages: Msg[];
+}
+
+export async function fetchThread(inquiryId: string): Promise<Thread> {
+  const res = await fetch(`/api/inbox/${inquiryId}/thread`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`thread failed: ${res.status}`);
+  return res.json();
+}
+
+/** Send a private reply into the parent's thread. Does NOT touch the graph. */
+export async function replyToParent(
+  inquiryId: string,
+  text: string
+): Promise<{ ok: boolean }> {
+  const res = await fetch(`/api/inbox/${inquiryId}/reply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({}));
+    throw new Error(msg?.error ?? `reply failed: ${res.status}`);
+  }
   return res.json();
 }
 

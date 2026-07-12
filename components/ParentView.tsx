@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { askFrontDesk, chips, resultToMessage, type Msg } from "@/lib/frontDesk";
+import {
+  askFrontDesk,
+  chips,
+  fetchHistory,
+  resultToMessage,
+  type Msg,
+} from "@/lib/frontDesk";
 
 export default function ParentView() {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -14,6 +20,22 @@ export default function ParentView() {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, typing]);
+
+  // Load the persisted transcript on mount, and refresh when the tab regains
+  // focus so a staff reply sent from the operator console shows up.
+  useEffect(() => {
+    const load = () => fetchHistory().then(setMessages).catch(() => {});
+    load();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", load);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", load);
+    };
+  }, []);
 
   const toggleSource = (id: number) =>
     setOpenSources((prev) =>
@@ -233,6 +255,79 @@ export default function ParentView() {
                   }}
                 >
                   {m.text}
+                </div>
+              );
+            }
+
+            if (m.type === "staff") {
+              return (
+                <div
+                  key={m.id}
+                  style={{
+                    alignSelf: "flex-start",
+                    width: "92%",
+                    background: "#FFFFFF",
+                    border: "1px solid #DDE7FF",
+                    borderRadius: 20,
+                    boxShadow: "0 10px 26px -14px rgba(84,99,214,.3)",
+                    padding: 16,
+                    animation: "fdUp .3s ease both",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 999,
+                        background: "#29B9BB",
+                        color: "#062B2B",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        display: "grid",
+                        placeItems: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {(m.by ?? "Sunnyside")
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((w) => w[0])
+                        .join("")
+                        .toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#18181D" }}>
+                        {m.by ?? "Sunnyside staff"}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "#737685" }}>
+                        Sunnyside staff
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        background: "#EEF1FF",
+                        color: "#4B57B8",
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Personal reply
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 11,
+                      fontSize: "14.5px",
+                      lineHeight: 1.55,
+                      color: "#18181D",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {m.text}
+                  </div>
                 </div>
               );
             }

@@ -77,16 +77,93 @@ def _as_uuid(value: str | None) -> uuid.UUID | None:
         return None
 
 
+def _conversation_for(db: Session, parent_id: uuid.UUID) -> models.Conversation:
+    """The parent's chat thread — one per parent, created on first message."""
+    conv = db.scalar(
+        select(models.Conversation)
+        .where(models.Conversation.parent_id == parent_id)
+        .order_by(models.Conversation.created_at)
+        .limit(1)
+    )
+    if conv is None:
+        conv = models.Conversation(parent_id=parent_id)
+        db.add(conv)
+        db.flush()
+    return conv
+
+
+def _message_to_msg(m: models.Message, idx: int) -> dict:
+    """Serialize a stored message into the shape the chat UI renders."""
+    c = m.content or {}
+    out: dict = {"id": idx, "type": m.kind}
+    if m.kind == "user":
+        out["text"] = c.get("text")
+    elif m.kind == "assistant-text":
+        out["text"] = c.get("answer") or c.get("text")
+    elif m.kind == "staff":
+        out["text"] = c.get("text")
+        out["by"] = c.get("by")
+    else:  # confident | escalation | lunch
+        out.update(
+            answer=c.get("answer"),
+            citation=c.get("citation"),
+            source=c.get("source"),
+            menu=c.get("menu"),
+        )
+    return out
+
+
+def _thread_messages(db: Session, parent_id: uuid.UUID) -> list[dict]:
+    conv = db.scalar(
+        select(models.Conversation)
+        .where(models.Conversation.parent_id == parent_id)
+        .order_by(models.Conversation.created_at)
+        .limit(1)
+    )
+    if conv is None:
+        return []
+    rows = db.scalars(
+        select(models.Message)
+        .where(models.Message.conversation_id == conv.id)
+        .order_by(models.Message.created_at)
+    ).all()
+    return [_message_to_msg(m, i + 1) for i, m in enumerate(rows)]
+
+
 @app.post("/ask")
 def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
-    """Parent asks a question. Runs the agent, logs the inquiry for the operator
-    inbox, and returns a renderable answer."""
-    result = agent.answer_question(db, body.question, asker_id=_as_uuid(body.asker_id))
+    """Parent asks a question. Runs the agent, persists the turn to the parent's
+    conversation thread, logs the inquiry for the operator inbox, and returns a
+    renderable answer."""
+    asker = _as_uuid(body.asker_id)
+    result = agent.answer_question(db, body.question, asker_id=asker)
+
+    # Persist the transcript (the human 1:1 channel — never read by the agent).
+    if asker is not None:
+        conv = _conversation_for(db, asker)
+        db.add(
+            models.Message(
+                conversation_id=conv.id, role="user", kind="user",
+                content={"text": body.question},
+            )
+        )
+        db.add(
+            models.Message(
+                conversation_id=conv.id, role="assistant", kind=result["kind"],
+                content={
+                    "answer": result.get("answer"),
+                    "citation": result.get("citation"),
+                    "source": result.get("source"),
+                    "menu": result.get("menu"),
+                },
+            )
+        )
+        db.commit()
 
     # Small talk (greetings, thanks) isn't a question the operator needs to see.
     if result.get("log", True):
         inquiry = models.Inquiry(
-            asker_id=_as_uuid(body.asker_id),
+            asker_id=asker,
             child_id=_as_uuid(body.child_id),
             text=body.question,
             status=result["status"],
@@ -99,6 +176,13 @@ def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
         result["inquiry_id"] = str(inquiry.id)
 
     return result
+
+
+@app.get("/history")
+def history(parent_id: str, db: Session = Depends(get_db)) -> list[dict]:
+    """The authenticated parent's own chat transcript (staff replies included)."""
+    pid = _as_uuid(parent_id)
+    return _thread_messages(db, pid) if pid else []
 
 
 class AuthorProposeRequest(BaseModel):
@@ -186,6 +270,57 @@ def changelog(db: Session = Depends(get_db)) -> list[dict]:
             }
         )
     return out
+
+
+@app.get("/inbox/{inquiry_id}/thread")
+def inbox_thread(inquiry_id: str, db: Session = Depends(get_db)) -> dict:
+    """The parent's full conversation behind an inquiry, for the operator to read
+    before replying. Anonymous inquiries have no account/thread to reply into."""
+    inq = db.get(models.Inquiry, _as_uuid(inquiry_id))
+    if inq is None:
+        raise HTTPException(status_code=404, detail="Inquiry not found.")
+    messages = _thread_messages(db, inq.asker_id) if inq.asker_id else []
+    return {
+        "who": _asker_context(db, inq),
+        "can_reply": inq.asker_id is not None,
+        "messages": messages,
+    }
+
+
+class ReplyRequest(BaseModel):
+    text: str
+    actor: str = "Operator"
+    actor_user_id: str | None = None
+
+
+@app.post("/inbox/{inquiry_id}/reply")
+def reply_inquiry(
+    inquiry_id: str, body: ReplyRequest, db: Session = Depends(get_db)
+) -> dict:
+    """Operator replies directly to the parent — a private message in the thread.
+    This is NOT a knowledge update: it lands in `messages`, which the agent never
+    reads, so it can't affect future AI answers. Resolves just this inquiry."""
+    inq = db.get(models.Inquiry, _as_uuid(inquiry_id))
+    if inq is None:
+        raise HTTPException(status_code=404, detail="Inquiry not found.")
+    if inq.asker_id is None:
+        raise HTTPException(status_code=400, detail="This inquiry has no parent account to reply to.")
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Reply is empty.")
+
+    conv = _conversation_for(db, inq.asker_id)
+    msg = models.Message(
+        conversation_id=conv.id, role="assistant", kind="staff",
+        content={"text": text, "by": body.actor},
+    )
+    db.add(msg)
+    inq.status = "resolved"
+    inq.resolution_text = text
+    inq.resolved_by_id = _as_uuid(body.actor_user_id)
+    inq.resolved_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"ok": True, "message_id": str(msg.id)}
 
 
 @app.get("/graph")

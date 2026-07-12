@@ -4,12 +4,16 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import {
   fetchInbox,
+  fetchThread,
   proposeChange,
+  replyToParent,
   resolveInquiry,
   statusStyles,
   type Change,
   type InboxItem,
+  type Msg,
   type Proposal,
+  type Thread,
 } from "@/lib/frontDesk";
 
 const PRIORITY: Record<InboxItem["status"], number> = {
@@ -37,6 +41,42 @@ function timeAgo(iso: string | null): string {
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `${hrs} hr ago`;
   return `${Math.round(hrs / 24)} d ago`;
+}
+
+function TranscriptBubble({ m }: { m: Msg }) {
+  const isUser = m.type === "user";
+  const isStaff = m.type === "staff";
+  const body = m.text ?? m.answer ?? "";
+  return (
+    <div
+      style={{
+        alignSelf: isUser ? "flex-end" : "flex-start",
+        maxWidth: "88%",
+        background: isUser ? "#5463D6" : isStaff ? "#EAF7F7" : "#F1F4FF",
+        color: isUser ? "#FFFFFF" : "#18181D",
+        fontSize: "13.5px",
+        lineHeight: 1.5,
+        padding: "10px 13px",
+        borderRadius: isUser ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+        whiteSpace: "pre-wrap",
+      }}
+    >
+      {isStaff && (
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#12878A", marginBottom: 3 }}>
+          {m.by ?? "Staff"} · staff reply
+        </div>
+      )}
+      {body}
+      {m.citation && !isUser && !isStaff && (
+        <div style={{ fontSize: 11, color: "#737685", marginTop: 5 }}>{m.citation}</div>
+      )}
+      {Array.isArray(m.menu) && m.menu.length > 0 && (
+        <div style={{ fontSize: 12, color: "#5C5E6A", marginTop: 5 }}>
+          {m.menu.join(" · ")}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const primaryBtn = (busy = false): CSSProperties => ({
@@ -322,6 +362,10 @@ export default function InboxPanel({
           onDraft={draft}
           onFold={fold}
           onMarkHandled={markHandled}
+          onReplied={() => {
+            onChanged?.();
+            load();
+          }}
           onDiscardProposal={() => {
             setProposal(null);
             setStage("idle");
@@ -346,6 +390,7 @@ function InquiryDetail({
   onDraft,
   onFold,
   onMarkHandled,
+  onReplied,
   onDiscardProposal,
 }: {
   item: InboxItem;
@@ -361,11 +406,47 @@ function InquiryDetail({
   onDraft: () => void;
   onFold: (changes: Change[]) => void;
   onMarkHandled: () => void;
+  onReplied: () => void;
   onDiscardProposal: () => void;
 }) {
   const s = statusStyles[item.status];
   const sensitive = item.category ? SENSITIVE.has(item.category) : false;
   const actionable = item.status === "escalated" || item.status === "lowconf";
+
+  // Conversation transcript + direct reply (private; never touches the graph).
+  const [thread, setThread] = useState<Thread | null>(null);
+  const [parentReply, setParentReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [replyErr, setReplyErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    setThread(null);
+    fetchThread(item.id)
+      .then((t) => live && setThread(t))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [item.id]);
+
+  const sendReply = async () => {
+    const t = parentReply.trim();
+    if (!t || sending) return;
+    setSending(true);
+    setReplyErr(null);
+    try {
+      await replyToParent(item.id, t);
+      setParentReply("");
+      const fresh = await fetchThread(item.id).catch(() => null);
+      if (fresh) setThread(fresh);
+      onReplied();
+    } catch (e) {
+      setReplyErr(e instanceof Error ? e.message : "Couldn't send reply.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: 720 }}>
@@ -474,6 +555,102 @@ function InquiryDetail({
           </div>
         )}
       </div>
+
+      {/* Conversation transcript */}
+      {thread && thread.messages.length > 0 && (
+        <div
+          style={{
+            marginTop: 18,
+            background: "#FFFFFF",
+            border: "1px solid #EBEFF4",
+            borderRadius: 20,
+            padding: 20,
+            boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
+          }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+            Conversation
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              marginTop: 14,
+            }}
+          >
+            {thread.messages.map((m) => (
+              <TranscriptBubble key={m.id} m={m} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reply directly to the parent (private — no graph write) */}
+      {thread?.can_reply && (
+        <div
+          style={{
+            marginTop: 18,
+            background: "#FFFFFF",
+            border: "1px solid #EBEFF4",
+            borderRadius: 20,
+            padding: 22,
+            boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
+          }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+            Reply to {item.who}
+          </div>
+          <div style={{ fontSize: "13px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
+            A private message in this parent&apos;s chat. It is{" "}
+            <b>not</b> added to the knowledge base and the AI never sees it.
+          </div>
+          <textarea
+            value={parentReply}
+            onChange={(e) => setParentReply(e.target.value)}
+            placeholder="Write a direct reply to this parent…"
+            style={{
+              width: "100%",
+              marginTop: 13,
+              background: "#F7F9FB",
+              border: "1px solid #EBEFF4",
+              borderRadius: 14,
+              padding: 14,
+              fontSize: "14.5px",
+              lineHeight: 1.5,
+              color: "#18181D",
+              minHeight: 76,
+              resize: "none",
+            }}
+          />
+          {replyErr && (
+            <div style={{ marginTop: 10, fontSize: 13, color: "#CF193A", fontWeight: 600 }}>
+              {replyErr}
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+            <button onClick={sendReply} disabled={sending} style={primaryBtn(sending)}>
+              {sending ? "Sending…" : "Send reply"}
+            </button>
+          </div>
+        </div>
+      )}
+      {thread && !thread.can_reply && (
+        <div
+          style={{
+            marginTop: 18,
+            background: "#F7F9FB",
+            border: "1px dashed #D9DFEA",
+            borderRadius: 14,
+            padding: "14px 16px",
+            fontSize: 13,
+            color: "#737685",
+          }}
+        >
+          No parent account is linked to this inquiry, so there&apos;s no chat to
+          reply into.
+        </div>
+      )}
 
       {/* Teach & fold */}
       {actionable && stage !== "resolved" && (

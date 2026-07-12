@@ -16,7 +16,7 @@ export default async function Home() {
         position: "relative",
       }}
     >
-      <SessionBar name={user?.name ?? ""} role={user?.role} active="parent" />
+      <SessionBar name={user?.name ?? ""} />
       <ParentView />
     </div>
   );

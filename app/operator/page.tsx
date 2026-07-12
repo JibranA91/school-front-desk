@@ -16,7 +16,7 @@ export default async function OperatorPage() {
         position: "relative",
       }}
     >
-      <SessionBar name={user?.name ?? ""} role="operator" active="operator" />
+      <SessionBar name={user?.name ?? ""} />
       <OperatorView
         operatorName={user?.name ?? "Maria Chen"}
         operatorTitle={user?.title ?? "Director"}
