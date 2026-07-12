@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import get_db, init_db
 from app import models
+from app.routers import auth as auth_router
 
 
 @asynccontextmanager
@@ -30,6 +31,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router.router)
 
 
 @app.get("/health")

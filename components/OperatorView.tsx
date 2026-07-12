@@ -31,7 +31,20 @@ function navBtn(active: boolean): CSSProperties {
   };
 }
 
-export default function OperatorView() {
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+export default function OperatorView({
+  operatorName = "Maria Chen",
+  operatorTitle = "Director",
+}: {
+  operatorName?: string;
+  operatorTitle?: string;
+}) {
   const [nav, setNav] = useState<Nav>("inbox");
   const [authorText, setAuthorText] = useState("");
   const [proposalState, setProposalState] = useState<ProposalState>("idle");
@@ -231,7 +244,7 @@ export default function OperatorView() {
               flexShrink: 0,
             }}
           >
-            MC
+            {initialsOf(operatorName)}
           </div>
           <div>
             <div
@@ -242,12 +255,12 @@ export default function OperatorView() {
                 lineHeight: 1.1,
               }}
             >
-              Maria Chen
+              {operatorName}
             </div>
             <div
               style={{ color: "#8188B8", fontSize: "11.5px", marginTop: 2 }}
             >
-              Director
+              {operatorTitle}
             </div>
           </div>
         </div>

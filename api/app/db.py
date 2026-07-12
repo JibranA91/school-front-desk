@@ -5,7 +5,14 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
 
-engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    future=True,
+    # Fail fast instead of blocking forever if a DDL lock is held by another
+    # (possibly orphaned) connection — otherwise startup init_db() can hang.
+    connect_args={"options": "-c lock_timeout=4000"},
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
