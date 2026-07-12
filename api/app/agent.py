@@ -275,12 +275,22 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
         + (", get_my_children (this family's kids/rooms)" if asker_id is not None else "")
         + ". List every source you used in `citations` — entity ids and/or live refs "
         "like 'live:menu'. Set intent='answer'. Be warm, concise, and specific.\n"
-        "- A question no tool can answer: set intent='unknown', answer='', no citations. "
-        "NEVER guess or use outside knowledge.\n"
+        "- A question no tool can answer: set intent='unknown', answer='', no citations.\n"
+        "\nGROUNDING — this is critical:\n"
+        "- Assert ONLY what the tool results explicitly state. Never infer, extrapolate, "
+        "guess, or combine facts to fill a gap, and never use outside knowledge.\n"
+        "- If the parent's SPECIFIC question isn't explicitly answered by the tool "
+        "results — even when related information exists — set intent='unknown'. "
+        "Related-but-not-specific is NOT an answer. (E.g. finding a general fee policy "
+        "does not let you confirm a specific discount it never mentions.)\n"
+        "- Answer 'no / we don't offer that' ONLY when a complete, authoritative source "
+        "shows it (e.g. the full program roster). Otherwise set intent='unknown'.\n"
         "Return the structured Answer."
     )
     agent = create_react_agent(
-        get_chat_model(settings.bedrock_parent_model),
+        # temperature=0: this is factual grounding, not creative writing — keeps
+        # borderline answer/hand-off decisions stable across runs.
+        get_chat_model(settings.bedrock_parent_model, temperature=0),
         tools=tools,
         prompt=system,
         response_format=Answer,

@@ -9,9 +9,13 @@ from app.config import settings
 _cache: dict[str, object] = {}
 
 
-def get_chat_model(model_id: str | None = None, max_tokens: int = 1024):
+def get_chat_model(
+    model_id: str | None = None,
+    max_tokens: int = 1024,
+    temperature: float | None = None,
+):
     mid = model_id or settings.bedrock_chat_model
-    key = f"{mid}#{max_tokens}"  # cache per (model, token budget)
+    key = f"{mid}#{max_tokens}#{temperature}"  # cache per (model, budget, temp)
     if key not in _cache:
         import boto3
         from langchain_aws import ChatBedrockConverse
@@ -22,5 +26,8 @@ def get_chat_model(model_id: str | None = None, max_tokens: int = 1024):
             aws_access_key_id=settings.aws_access_key_id,
             aws_secret_access_key=settings.aws_secret_access_key,
         )
-        _cache[key] = ChatBedrockConverse(client=client, model=mid, max_tokens=max_tokens)
+        kwargs: dict = {"client": client, "model": mid, "max_tokens": max_tokens}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        _cache[key] = ChatBedrockConverse(**kwargs)
     return _cache[key]
