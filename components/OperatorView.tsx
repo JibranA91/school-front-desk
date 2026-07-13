@@ -64,6 +64,7 @@ export default function OperatorView({
   const [ingestError, setIngestError] = useState<string | null>(null);
   const [graphToken, setGraphToken] = useState(0);
   const [inboxCount, setInboxCount] = useState<number | null>(null);
+  const [inboxResetKey, setInboxResetKey] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const refreshLog = () => fetchChangelog().then(setLog).catch(() => {});
@@ -238,7 +239,10 @@ export default function OperatorView({
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <button
             className="fd-nav"
-            onClick={() => setNav("inbox")}
+            onClick={() => {
+              setNav("inbox");
+              setInboxResetKey((k) => k + 1); // also pop back to the list
+            }}
             style={navBtn(nav === "inbox")}
           >
             <svg
@@ -371,6 +375,7 @@ export default function OperatorView({
               setGraphToken((t) => t + 1);
             }}
             onOpenCount={setInboxCount}
+            resetSignal={inboxResetKey}
           />
         )}
 

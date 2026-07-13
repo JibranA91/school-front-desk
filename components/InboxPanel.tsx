@@ -434,9 +434,11 @@ const ghostBtn: CSSProperties = {
 export default function InboxPanel({
   onChanged,
   onOpenCount,
+  resetSignal,
 }: {
   onChanged?: () => void;
   onOpenCount?: (n: number) => void;
+  resetSignal?: number; // bump to force back to the list view (e.g. sidebar "Inbox")
 }) {
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -464,6 +466,11 @@ export default function InboxPanel({
     const poll = setInterval(load, 4000);
     return () => clearInterval(poll);
   }, []);
+
+  // Sidebar "Inbox" (or any reset bump) returns from a detail to the list.
+  useEffect(() => {
+    setSelectedId(null);
+  }, [resetSignal]);
 
   // Deduped counts per status for the at-a-glance stats (independent of grouping).
   const stats = useMemo(() => {
@@ -879,11 +886,15 @@ function InquiryDetail({
             Conversation
           </div>
           <div
+            className="fd-scroll"
             style={{
               display: "flex",
               flexDirection: "column",
               gap: 10,
               marginTop: 14,
+              maxHeight: 320,
+              overflowY: "auto",
+              paddingRight: 4,
             }}
           >
             {thread.messages.map((m) => (
