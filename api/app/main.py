@@ -71,6 +71,14 @@ class AskRequest(BaseModel):
     child_id: str | None = None
 
 
+class ActorRequest(BaseModel):
+    """Just who is acting — for endpoints that carry no other payload
+    (entity delete, changelog revert)."""
+
+    actor: str = "Operator"
+    actor_user_id: str | None = None
+
+
 def _as_uuid(value: str | None) -> uuid.UUID | None:
     if not value:
         return None
@@ -348,6 +356,7 @@ def changelog(db: Session = Depends(get_db)) -> list[dict]:
         )
         out.append(
             {
+                "id": str(c.id),
                 "who": c.actor,
                 "when": c.created_at.strftime("%b %d · %I:%M %p").replace(" 0", " ")
                 if c.created_at
@@ -358,9 +367,65 @@ def changelog(db: Session = Depends(get_db)) -> list[dict]:
                 "isDiff": c.is_diff,
                 "initials": initials,
                 "color": color,
+                # Only operator edits/deletes carry a restorable snapshot.
+                "revertable": c.snapshot is not None,
             }
         )
     return out
+
+
+@app.post("/changelog/{entry_id}/revert")
+def revert_change(
+    entry_id: str, body: ActorRequest = ActorRequest(), db: Session = Depends(get_db)
+) -> dict:
+    """Undo a previous change by restoring the entity to its pre-change state
+    (from the changelog snapshot). An add reverts to a delete; an update or a
+    delete reverts to the captured 'before'. Logs the revert itself."""
+    entry = db.get(models.ChangelogEntry, _as_uuid(entry_id))
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Changelog entry not found.")
+    snap = entry.snapshot
+    if not snap:
+        raise HTTPException(status_code=400, detail="This change can't be reverted.")
+
+    eid = snap["entity_id"]
+    before = snap.get("before")
+    e = db.get(models.KbEntity, eid)
+
+    if before is None:
+        # The change created this entity — undoing it means removing it.
+        label = e.name if e is not None else eid
+        if e is not None:
+            _delete_entity_cascade(db, e)
+        action = f"Reverted — removed {label}"
+        entity_id = None
+    else:
+        # Restore (recreating the entity if a delete is being undone).
+        if e is None:
+            e = models.KbEntity(id=eid, type=before["type"], name=before["name"])
+            db.add(e)
+            db.flush()
+        e.type = before["type"]
+        e.name = before["name"]
+        e.attributes = dict(before.get("attributes") or {})
+        flag_modified(e, "attributes")
+        e.sources = list(before.get("sources") or [])
+        _reembed(db, e)
+        action = f"Reverted change to {before['name']}"
+        entity_id = e.id
+
+    db.add(
+        models.ChangelogEntry(
+            actor=body.actor,
+            actor_user_id=_as_uuid(body.actor_user_id),
+            action=action,
+            entity_id=entity_id,
+            is_diff=False,
+            snapshot=None,  # a revert is not itself revertable
+        )
+    )
+    db.commit()
+    return {"ok": True}
 
 
 @app.get("/inbox/{inquiry_id}/thread")
@@ -560,11 +625,6 @@ def update_entity(
     )
     db.commit()
     return {"ok": True, "id": e.id}
-
-
-class ActorRequest(BaseModel):
-    actor: str = "Operator"
-    actor_user_id: str | None = None
 
 
 @app.delete("/entity/{entity_id}")

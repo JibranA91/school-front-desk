@@ -407,6 +407,7 @@ export const suggestions: { label: string; text: string }[] = [
 ];
 
 export interface ChangelogEntry {
+  id?: string;
   who: string;
   when: string;
   what: string;
@@ -415,6 +416,20 @@ export interface ChangelogEntry {
   isDiff: boolean;
   initials: string;
   color: string;
+  revertable?: boolean;
+}
+
+/** Undo a change: restore the entity to its pre-change state (or remove it if
+ *  the change created it). Only entries with a snapshot are revertable. */
+export async function revertChange(id: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`/api/changelog/${encodeURIComponent(id)}/revert`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({}));
+    throw new Error(msg?.error ?? `revert failed: ${res.status}`);
+  }
+  return res.json();
 }
 
 export const changelog: ChangelogEntry[] = [

@@ -10,6 +10,7 @@ import {
   fetchChangelog,
   importHandbook,
   proposeChange,
+  revertChange,
   suggestions,
   type ChangelogEntry,
   type IngestReport,
@@ -68,6 +69,8 @@ export default function OperatorView({
   const [graphToken, setGraphToken] = useState(0);
   const [inboxCount, setInboxCount] = useState<number | null>(null);
   const [inboxResetKey, setInboxResetKey] = useState(0);
+  const [revertConfirmId, setRevertConfirmId] = useState<string | null>(null);
+  const [revertBusyId, setRevertBusyId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const refreshLog = () => fetchChangelog().then(setLog).catch(() => {});
@@ -169,6 +172,20 @@ export default function OperatorView({
     setConflictOpen(false);
     setProposal(null);
     setAuthorText("");
+  };
+
+  const doRevert = async (id: string) => {
+    setRevertBusyId(id);
+    try {
+      await revertChange(id);
+      setRevertConfirmId(null);
+      refreshLog();
+      setGraphToken((t) => t + 1);
+    } catch {
+      /* leave the entry as-is */
+    } finally {
+      setRevertBusyId(null);
+    }
   };
 
   const conflict = proposal?.changes.find((c) => c.is_conflict) ?? null;
@@ -1115,6 +1132,88 @@ export default function OperatorView({
                         >
                           {c.after}
                         </span>
+                      </div>
+                    )}
+                    {c.revertable && c.id && (
+                      <div style={{ marginTop: 11 }}>
+                        {revertConfirmId === c.id ? (
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 9,
+                            }}
+                          >
+                            <span style={{ fontSize: "12.5px", color: "#737685" }}>
+                              Undo this change?
+                            </span>
+                            <button
+                              onClick={() => doRevert(c.id!)}
+                              disabled={revertBusyId === c.id}
+                              style={{
+                                background: "#5463D6",
+                                color: "#FFFFFF",
+                                border: "none",
+                                borderRadius: 9,
+                                padding: "6px 13px",
+                                fontSize: "12.5px",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {revertBusyId === c.id ? "Reverting…" : "Yes, revert"}
+                            </button>
+                            <button
+                              onClick={() => setRevertConfirmId(null)}
+                              disabled={revertBusyId === c.id}
+                              style={{
+                                background: "transparent",
+                                color: "#5C5E6A",
+                                border: "1px solid #EBEFF4",
+                                borderRadius: 9,
+                                padding: "6px 13px",
+                                fontSize: "12.5px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setRevertConfirmId(c.id!)}
+                            className="fd-chip"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              background: "transparent",
+                              color: "#5463D6",
+                              border: "1px solid #E3E8FF",
+                              borderRadius: 9,
+                              padding: "6px 12px",
+                              fontSize: "12.5px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M3 7v6h6" />
+                              <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                            </svg>
+                            Revert
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

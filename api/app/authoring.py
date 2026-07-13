@@ -20,6 +20,16 @@ from app import models
 from app.config import settings
 
 
+def _entity_state(e: models.KbEntity) -> dict:
+    """A restorable snapshot of an entity, stored on the changelog for revert."""
+    return {
+        "type": e.type,
+        "name": e.name,
+        "attributes": dict(e.attributes or {}),
+        "sources": list(e.sources or []),
+    }
+
+
 def _serialize_graph(db: Session) -> str:
     rows = db.scalars(select(models.KbEntity)).all()
     lines = []
@@ -107,10 +117,15 @@ def apply(
     # Apply all fields; group by entity so the changelog gets one line per change.
     touched: dict[str, models.KbEntity] = {}
     per_entity: dict[str, list[dict]] = {}
+    # Pre-change state per entity (None = newly created), for one-click revert.
+    before_state: dict[str, dict | None] = {}
     for c in changes:
         if c.get("is_conflict") and not accept_conflicts:
             continue
-        e = db.get(models.KbEntity, c["entity_id"])
+        eid = c["entity_id"]
+        e = db.get(models.KbEntity, eid)
+        if eid not in before_state:
+            before_state[eid] = _entity_state(e) if e is not None else None
         if e is None:
             e = models.KbEntity(
                 id=c["entity_id"],
@@ -142,6 +157,7 @@ def apply(
                 before=rep.get("old_value"),
                 after=rep["new_value"],
                 is_diff=bool(rep.get("old_value")),
+                snapshot={"entity_id": eid, "before": before_state[eid]},
             )
         )
 
