@@ -333,16 +333,39 @@ def link_similar(
 
 
 def clear_ingested(db: Session, id_prefix: str = "hb-") -> int:
-    """Remove a previous handbook import (entities + its changelog rows), scoped
-    strictly to the `id_prefix` collection. Never touches curated/operator data.
-    Makes re-importing idempotent rather than piling up suffixed duplicates."""
-    from sqlalchemy import delete
+    """Remove a previous handbook import, scoped strictly to the `id_prefix`
+    collection. Never touches curated/operator data. Makes re-importing
+    idempotent rather than piling up suffixed duplicates.
 
+    Order matters: relationship edges and changelog rows reference kb_entities
+    (FKs), so they must be cleared/unlinked before the entities are deleted."""
+    from sqlalchemy import delete, or_, update
+
+    like = f"{id_prefix}%"
+    # 1) Relationship edges touching an ingested entity (e.g. the semantic
+    #    "related" links) — otherwise the entity delete hits a FK violation.
+    db.execute(
+        delete(models.KbRelationship).where(
+            or_(
+                models.KbRelationship.src_id.like(like),
+                models.KbRelationship.dst_id.like(like),
+            )
+        )
+    )
+    # 2) Import-noise changelog rows for this collection.
     db.execute(
         delete(models.ChangelogEntry).where(models.ChangelogEntry.reason == "handbook ingest")
     )
+    # 3) Any other changelog rows referencing these entities: keep the audit
+    #    line but unlink the entity so the FK doesn't block the delete.
+    db.execute(
+        update(models.ChangelogEntry)
+        .where(models.ChangelogEntry.entity_id.like(like))
+        .values(entity_id=None)
+    )
+    # 4) The entities themselves.
     n = db.execute(
-        delete(models.KbEntity).where(models.KbEntity.id.like(f"{id_prefix}%"))
+        delete(models.KbEntity).where(models.KbEntity.id.like(like))
     ).rowcount
     db.commit()
     return n or 0
