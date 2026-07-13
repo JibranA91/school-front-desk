@@ -125,6 +125,8 @@ export interface Change {
   field: string;
   old_value: string | null;
   new_value: string;
+  /** Canonical parent-facing sentence, kept in sync with the structured value. */
+  body?: string | null;
   is_conflict: boolean;
   source: string | null;
 }

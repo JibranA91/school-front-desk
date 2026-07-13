@@ -9,6 +9,7 @@ re-embed, and append changelog entries.
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Literal
 
@@ -18,6 +19,11 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app import models
 from app.config import settings
+
+
+def _norm(s: str) -> str:
+    """Loosely normalize a name for near-duplicate detection."""
+    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
 
 
 def _entity_state(e: models.KbEntity) -> dict:
@@ -56,6 +62,13 @@ def propose(db: Session, instruction: str) -> dict:
             description="The attribute key to set, e.g. 'open', 'monthly', 'date', 'status', 'body'."
         )
         new_value: str = Field(description="The new value, always as a string.")
+        body: str = Field(
+            description="The complete corrected fact as ONE plain-language sentence a parent "
+            "would read. This is the canonical statement the front desk answers from, so it "
+            "MUST fully reflect this change and stay consistent with new_value (never leave "
+            "prose that contradicts the structured value). Keep any existing detail that "
+            "still applies."
+        )
 
     class Proposal(BaseModel):
         summary: str = Field(description="Short label for this change, e.g. 'Weekday opening time'.")
@@ -64,20 +77,36 @@ def propose(db: Session, instruction: str) -> dict:
     system = (
         "You maintain a childcare center's knowledge graph. Given the operator's plain-language "
         "instruction and the current entities, output the MINIMAL set of operations to apply.\n"
-        "- To change an existing fact, use action='update' with that entity's exact id and the "
-        "attribute field to change.\n"
-        "- For genuinely new information not covered by any entity, use action='add' with a new "
-        "kebab-case id and an appropriate type.\n"
+        "- STRONGLY PREFER updating an existing entity that already covers this topic: use "
+        "action='update' with that entity's EXACT id. Scan the current entities for one that is "
+        "about the same thing, even if worded differently. Never create a new entity that would "
+        "duplicate or contradict an existing one.\n"
+        "- Use action='add' with a new kebab-case id ONLY for genuinely new information no "
+        "existing entity covers.\n"
+        "- `body` is the canonical, parent-facing statement of the fact — our answers to parents "
+        "are grounded in it. For EVERY operation, write `body` as a complete sentence stating the "
+        "corrected fact, so the wording can never contradict the structured value you set.\n"
         "- new_value is always a string. Be precise; do not invent unrelated changes.\n\n"
         f"CURRENT ENTITIES:\n{_serialize_graph(db)}"
     )
     model = get_chat_model(settings.bedrock_chat_model).with_structured_output(Proposal)
     proposal = model.invoke([("system", system), ("human", instruction)])
 
+    # Backstop against the model spawning a contradictory near-duplicate: if it
+    # emits an "add" whose name matches an existing entity, retarget to update it.
+    by_name = {}
+    for x in db.scalars(select(models.KbEntity)).all():
+        by_name.setdefault(_norm(x.name), x)
+
     changes: list[dict] = []
     has_conflict = False
     for op in proposal.operations:
         e = db.get(models.KbEntity, op.entity_id)
+        if e is None:
+            twin = by_name.get(_norm(op.name))
+            if twin is not None:
+                op.entity_id = twin.id
+                e = twin
         old_value = (e.attributes or {}).get(op.field) if e is not None else None
         action = "update" if e is not None else "add"
         is_conflict = (
@@ -95,6 +124,7 @@ def propose(db: Session, instruction: str) -> dict:
                 "field": op.field,
                 "old_value": None if old_value is None else str(old_value),
                 "new_value": op.new_value,
+                "body": op.body,
                 "is_conflict": is_conflict,
                 "source": (e.sources[0] if e and e.sources else None) if e else None,
             }
@@ -138,6 +168,11 @@ def apply(
             db.flush()
         attrs = dict(e.attributes or {})
         attrs[c["field"]] = c["new_value"]
+        # Keep the canonical parent-facing `body` in lockstep with the structured
+        # change, so the prose the agent reads can never go stale (the bug where
+        # status flipped to "open" but body still said "closed").
+        if c.get("body"):
+            attrs["body"] = c["body"]
         e.attributes = attrs
         flag_modified(e, "attributes")
         touched[e.id] = e

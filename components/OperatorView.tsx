@@ -878,6 +878,21 @@ export default function OperatorView({
                           {c.name} · {c.field}: {c.new_value}
                         </span>
                       </div>
+                      {c.body && (
+                        <div
+                          style={{
+                            fontSize: "12.5px",
+                            color: "#5C5E6A",
+                            lineHeight: 1.5,
+                            padding: "2px 2px 0",
+                          }}
+                        >
+                          <span style={{ fontWeight: 700, color: "#737685" }}>
+                            Parents will see:{" "}
+                          </span>
+                          {c.body}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
