@@ -77,22 +77,80 @@ const TOPIC_LABEL: Record<string, string> = {
 };
 const topicLabel = (t: string | null) => (t && TOPIC_LABEL[t]) || t || "Other";
 
-/** Cluster collapsed rows by topic, largest cluster first ("Other" always last). */
-function clusterByTopic(
-  rows: { item: InboxItem; count: number }[],
-): { topic: string; entries: { item: InboxItem; count: number }[] }[] {
-  const byTopic = new Map<string, { item: InboxItem; count: number }[]>();
-  for (const r of rows) {
-    const label = topicLabel(r.item.topic);
-    (byTopic.get(label) ?? byTopic.set(label, []).get(label)!).push(r);
+export type GroupBy = "status" | "topic" | "family";
+export const GROUP_BY_LABELS: Record<GroupBy, string> = {
+  status: "Status",
+  topic: "Topic",
+  family: "Family",
+};
+
+const STATUS_RANK: Record<InboxItem["status"], number> = {
+  escalated: 0,
+  lowconf: 1,
+  answered: 2,
+  resolved: 3,
+};
+
+interface DisplayGroup {
+  id: string;
+  label: string;
+  tone: Tone;
+  rows: { item: InboxItem; count: number }[];
+  hasAttention: boolean;
+}
+
+function groupTone(items: InboxItem[]): Tone {
+  if (items.some((i) => i.status === "escalated" || i.status === "lowconf")) return "amber";
+  if (items.some((i) => i.status === "answered")) return "green";
+  return "indigo";
+}
+
+/** Partition inbox items into collapsible groups along the chosen dimension.
+ *  Within a group, rows are status-then-recency sorted and deduped. */
+function buildGroups(items: InboxItem[], groupBy: GroupBy): DisplayGroup[] {
+  const sorted = [...items].sort(
+    (a, b) =>
+      STATUS_RANK[a.status] - STATUS_RANK[b.status] ||
+      (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+  );
+  const keyOf = (it: InboxItem): string => {
+    if (groupBy === "status") {
+      if (it.status === "escalated" || it.status === "lowconf") return "Needs your attention";
+      if (it.status === "resolved") return "Resolved";
+      return "Answered by the AI";
+    }
+    if (groupBy === "topic") return topicLabel(it.topic);
+    return it.who || "Unknown";
+  };
+
+  const buckets = new Map<string, InboxItem[]>();
+  for (const it of sorted) {
+    const k = keyOf(it);
+    (buckets.get(k) ?? buckets.set(k, []).get(k)!).push(it);
   }
-  return [...byTopic.entries()]
-    .map(([topic, entries]) => ({ topic, entries }))
-    .sort((a, b) => {
-      if (a.topic === "Other") return 1;
-      if (b.topic === "Other") return -1;
-      return b.entries.length - a.entries.length || a.topic.localeCompare(b.topic);
-    });
+
+  const groups: DisplayGroup[] = [...buckets.entries()].map(([label, arr]) => ({
+    id: `${groupBy}:${label}`,
+    label,
+    tone: groupTone(arr),
+    rows: collapse(arr),
+    hasAttention: arr.some((i) => i.status === "escalated" || i.status === "lowconf"),
+  }));
+
+  if (groupBy === "status") {
+    const order = ["Needs your attention", "Answered by the AI", "Resolved"];
+    groups.sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
+  } else {
+    // Groups with pending attention float up; "Other" sinks; then by size.
+    groups.sort(
+      (a, b) =>
+        Number(b.hasAttention) - Number(a.hasAttention) ||
+        (a.label === "Other" ? 1 : b.label === "Other" ? -1 : 0) ||
+        b.rows.length - a.rows.length ||
+        a.label.localeCompare(b.label),
+    );
+  }
+  return groups;
 }
 
 const SENSITIVE = new Set([
@@ -216,26 +274,52 @@ function InboxRow({
   );
 }
 
-function InboxSection({
-  title,
-  tone,
-  rows,
+function CollapsibleGroup({
+  group,
+  collapsed,
+  onToggle,
   onOpen,
-  emptyText,
-  dim,
 }: {
-  title: string;
-  tone: Tone;
-  rows: { item: InboxItem; count: number }[];
+  group: DisplayGroup;
+  collapsed: boolean;
+  onToggle: () => void;
   onOpen: (i: InboxItem) => void;
-  emptyText?: string;
-  dim?: boolean;
 }) {
-  const t = TONES[tone];
-  if (!rows.length && !emptyText) return null;
+  const t = TONES[group.tone];
   return (
-    <div style={{ marginTop: 22 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+    <div style={{ marginTop: 16 }}>
+      <button
+        onClick={onToggle}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          width: "100%",
+          textAlign: "left",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: "6px 2px",
+          marginBottom: 8,
+        }}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#9AA0B4"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            flexShrink: 0,
+            transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
+            transition: "transform .15s",
+          }}
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
         <span
           style={{ width: 8, height: 8, borderRadius: 999, background: t.dot, display: "inline-block" }}
         />
@@ -248,7 +332,7 @@ function InboxSection({
             color: "#737685",
           }}
         >
-          {title}
+          {group.label}
         </span>
         <span
           style={{
@@ -260,10 +344,10 @@ function InboxSection({
             padding: "1px 9px",
           }}
         >
-          {rows.length}
+          {group.rows.length}
         </span>
-      </div>
-      {rows.length ? (
+      </button>
+      {!collapsed && (
         <div
           style={{
             background: "#FFFFFF",
@@ -273,57 +357,15 @@ function InboxSection({
             boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
           }}
         >
-          {clusterByTopic(rows).map(({ topic, entries }) => (
-            <div key={topic}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "8px 18px",
-                  background: "#FAFBFE",
-                  borderBottom: "1px solid #F0F3F8",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 800,
-                    letterSpacing: ".04em",
-                    textTransform: "uppercase",
-                    color: "#8A8FA3",
-                  }}
-                >
-                  {topic}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#A2A6B4" }}>
-                  {entries.length}
-                </span>
-              </div>
-              {entries.map(({ item, count }) => (
-                <InboxRow
-                  key={item.id}
-                  item={item}
-                  count={count}
-                  dim={dim}
-                  onClick={() => onOpen(item)}
-                />
-              ))}
-            </div>
+          {group.rows.map(({ item, count }) => (
+            <InboxRow
+              key={item.id}
+              item={item}
+              count={count}
+              dim={item.status === "resolved"}
+              onClick={() => onOpen(item)}
+            />
           ))}
-        </div>
-      ) : (
-        <div
-          style={{
-            background: "#FFFFFF",
-            border: "1px dashed #E4E8F1",
-            borderRadius: 16,
-            padding: 18,
-            fontSize: "13.5px",
-            color: "#737685",
-          }}
-        >
-          {emptyText}
         </div>
       )}
     </div>
@@ -407,6 +449,8 @@ export default function InboxPanel({
   const [resolvedCount, setResolvedCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<GroupBy>("status");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const load = () =>
     fetchInbox()
@@ -421,31 +465,29 @@ export default function InboxPanel({
     return () => clearInterval(poll);
   }, []);
 
-  // Split into what needs the operator vs. what the AI already handled vs.
-  // resolved, newest-first, collapsing duplicate questions within each.
-  const groups = useMemo(() => {
-    const sorted = [...items].sort(
-      (a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""),
-    );
-    const attention: InboxItem[] = [];
-    const answered: InboxItem[] = [];
-    const resolved: InboxItem[] = [];
-    for (const it of sorted) {
-      if (it.status === "escalated" || it.status === "lowconf") attention.push(it);
-      else if (it.status === "resolved") resolved.push(it);
-      else answered.push(it);
-    }
+  // Deduped counts per status for the at-a-glance stats (independent of grouping).
+  const stats = useMemo(() => {
+    const count = (fn: (i: InboxItem) => boolean) => collapse(items.filter(fn)).length;
     return {
-      attention: collapse(attention),
-      answered: collapse(answered),
-      resolved: collapse(resolved),
+      attention: count((i) => i.status === "escalated" || i.status === "lowconf"),
+      answered: count((i) => i.status === "answered"),
+      resolved: count((i) => i.status === "resolved"),
     };
   }, [items]);
 
-  const attentionCount = groups.attention.length;
+  const grouped = useMemo(() => buildGroups(items, groupBy), [items, groupBy]);
+
+  const toggleGroup = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   useEffect(() => {
-    onOpenCount?.(attentionCount);
-  }, [attentionCount, onOpenCount]);
+    onOpenCount?.(stats.attention);
+  }, [stats.attention, onOpenCount]);
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
@@ -542,38 +584,69 @@ export default function InboxPanel({
 
           {/* At-a-glance stats */}
           <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-            <StatChip label="Need attention" value={attentionCount} tone="amber" />
-            <StatChip label="Auto-answered" value={groups.answered.length} tone="green" />
-            <StatChip label="Resolved" value={groups.resolved.length} tone="indigo" />
+            <StatChip label="Need attention" value={stats.attention} tone="amber" />
+            <StatChip label="Auto-answered" value={stats.answered} tone="green" />
+            <StatChip label="Resolved" value={stats.resolved} tone="indigo" />
+          </div>
+
+          {!loading && stats.attention === 0 && (
+            <div style={{ marginTop: 12, fontSize: 13, color: "#227A47", fontWeight: 600 }}>
+              ✓ You&apos;re all caught up — nothing needs you right now.
+            </div>
+          )}
+
+          {/* Group-by control */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              marginTop: 18,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: "12.5px", color: "#737685", fontWeight: 600, marginRight: 2 }}>
+              Group by
+            </span>
+            {(Object.keys(GROUP_BY_LABELS) as GroupBy[]).map((g) => (
+              <button
+                key={g}
+                onClick={() => setGroupBy(g)}
+                style={{
+                  padding: "6px 13px",
+                  borderRadius: 999,
+                  fontSize: "12.5px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all .15s",
+                  border: `1px solid ${groupBy === g ? "#5463D6" : "#E3E8FF"}`,
+                  background: groupBy === g ? "#5463D6" : "#FFFFFF",
+                  color: groupBy === g ? "#FFFFFF" : "#5463D6",
+                }}
+              >
+                {GROUP_BY_LABELS[g]}
+              </button>
+            ))}
           </div>
 
           {loading ? (
             <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
               Loading inbox…
             </div>
+          ) : grouped.length === 0 ? (
+            <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
+              No questions yet.
+            </div>
           ) : (
-            <>
-              <InboxSection
-                title="Needs your attention"
-                tone="amber"
-                rows={groups.attention}
-                onOpen={openDetail}
-                emptyText="You're all caught up — nothing waiting on you."
-              />
-              <InboxSection
-                title="Answered by the AI"
-                tone="green"
-                rows={groups.answered}
+            grouped.map((g) => (
+              <CollapsibleGroup
+                key={g.id}
+                group={g}
+                collapsed={collapsed.has(g.id)}
+                onToggle={() => toggleGroup(g.id)}
                 onOpen={openDetail}
               />
-              <InboxSection
-                title="Resolved"
-                tone="indigo"
-                rows={groups.resolved}
-                onOpen={openDetail}
-                dim
-              />
-            </>
+            ))
           )}
         </>
       ) : (
