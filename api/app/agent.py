@@ -54,9 +54,10 @@ def group_key(text: str) -> str:
 
 
 def todays_menu(db: Session) -> list[str] | None:
+    """Today's posted menu, or None if nothing is posted for today. We deliberately
+    do NOT fall back to the most recent day — serving a stale menu as "today's" is
+    worse than honestly saying it isn't posted (a parent could pack the wrong food)."""
     row = db.scalar(select(models.MenuDay).where(models.MenuDay.day == date.today()))
-    if row is None:  # fall back to the most recent day so the demo isn't date-fragile
-        row = db.scalar(select(models.MenuDay).order_by(models.MenuDay.day.desc()))
     return list(row.items) if row and row.items else None
 
 
@@ -228,7 +229,9 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
     @tool
     def get_todays_menu() -> dict:
         """Today's lunch and snacks, synced live from the kitchen. Use for any
-        menu/lunch/food question. Cite ref 'live:menu'."""
+        menu/lunch/food question. Cite ref 'live:menu'. If posted is false, today's
+        menu isn't up yet — tell the parent that plainly and offer to check with
+        staff; do NOT guess or describe a different day's menu."""
         menu = todays_menu(db)
         return {"ref": "live:menu", "items": menu or [], "posted": bool(menu)}
 

@@ -7,9 +7,10 @@ Embeddings are left NULL here — they're computed when the retrieval layer land
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import bcrypt
+from sqlalchemy import select
 
 from app.db import Base, SessionLocal, engine, init_db
 from app import models
@@ -17,9 +18,35 @@ from app.embeddings import embed_texts, entity_text
 
 DEMO_PASSWORD = "demo1234"
 
+# A rotating week of weekday lunches (Mon–Fri), so "menus rotate weekly" is backed
+# by real data rather than a single day. Each list is entrée + sides + drink.
+WEEKDAY_MENUS: list[list[str]] = [
+    ["Turkey & cheese sandwich", "Crisp apple slices", "Whole milk"],
+    ["Cheese quesadilla", "Black beans & corn", "Orange wedges", "Whole milk"],
+    ["Whole-wheat pasta with marinara", "Steamed green beans", "Pear slices", "Whole milk"],
+    ["Baked chicken tenders", "Brown rice", "Roasted carrots", "Whole milk"],
+    ["Veggie & cheese pizza", "Garden salad", "Banana", "Whole milk"],
+]
+
 
 def _hash(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+
+
+def seed_menu_week(db, today: date | None = None) -> int:
+    """Upsert this week's weekday menus (Mon–Fri) so today (if a weekday) always
+    has a fresh menu and the demo never goes stale. Idempotent — safe to re-run
+    without touching any other data. Returns how many days were written."""
+    today = today or date.today()
+    monday = today - timedelta(days=today.weekday())  # Monday of the current week
+    for offset, items in enumerate(WEEKDAY_MENUS):
+        day = monday + timedelta(days=offset)
+        row = db.scalar(select(models.MenuDay).where(models.MenuDay.day == day))
+        if row is None:
+            db.add(models.MenuDay(day=day, items=list(items)))
+        else:
+            row.items = list(items)
+    return len(WEEKDAY_MENUS)
 
 
 def reset_schema() -> None:
@@ -160,13 +187,8 @@ def seed() -> None:
             ]
         )
 
-        # --- Menu (today) ---
-        db.add(
-            models.MenuDay(
-                day=date.today(),
-                items=["Turkey & cheese sandwich", "Crisp apple slices", "Whole milk"],
-            )
-        )
+        # --- Menu (a rotating week, Mon–Fri) ---
+        seed_menu_week(db)
 
         # --- Inbox (inquiries) ---
         db.add_all(
