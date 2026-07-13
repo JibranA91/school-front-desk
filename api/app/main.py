@@ -1,4 +1,5 @@
 import tempfile
+import threading
 from collections import Counter
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -14,7 +15,7 @@ import uuid
 from pydantic import BaseModel
 
 from app.config import settings
-from app.db import get_db, init_db
+from app.db import SessionLocal, get_db, init_db
 from app import agent, authoring, ingest, models, retrieval
 from app.routers import auth as auth_router
 
@@ -250,32 +251,87 @@ def author_apply(body: AuthorApplyRequest, db: Session = Depends(get_db)) -> dic
     )
 
 
+# In-memory ingest job progress (single-process demo; not persisted).
+_INGEST_JOBS: dict[str, dict] = {}
+
+
+def _run_ingest_job(job_id: str, tmp_path: Path, label: str, actor: str, replace: bool) -> None:
+    """Background worker: clears (optionally), ingests, and links — updating the
+    job's progress dict as it works through the handbook's sections."""
+    job = _INGEST_JOBS[job_id]
+    db = None
+    try:
+        db = SessionLocal()
+        if replace:
+            job.update(phase="Clearing the previous handbook…")
+            job["replaced"] = ingest.clear_ingested(db)
+        job.update(phase="Reading the handbook…")
+
+        def on_progress(done: int, total: int, entities: int, pages: int) -> None:
+            job.update(
+                phase=f"Reading section {done} of {total}…",
+                chunks_done=done,
+                chunks_total=total,
+                entities=entities,
+                pages=pages,
+            )
+
+        report = ingest.ingest_pdf(
+            db, tmp_path, source_label=label, actor=actor, progress=on_progress
+        )
+        report["replaced"] = job.get("replaced", 0)
+        job.update(status="done", phase="Done", entities=report["created"], report=report)
+    except Exception as exc:  # noqa: BLE001
+        job.update(status="error", error=str(exc))
+    finally:
+        if db is not None:
+            db.close()
+        tmp_path.unlink(missing_ok=True)
+
+
 @app.post("/ingest")
 async def ingest_handbook(
     file: UploadFile = File(...),
     label: str = Form("Family Handbook"),
     actor: str = Form("Operator"),
     replace: bool = Form(True),
-    db: Session = Depends(get_db),
 ) -> dict:
-    """Ingest an uploaded handbook PDF into the knowledge graph. The extraction
-    agent (Sonnet when Bedrock is on) turns it into typed `hb-` entities; retrieval
-    picks them up immediately. `replace` clears any prior handbook import first."""
+    """Start a handbook ingestion job. Returns a job_id immediately; the client
+    polls /ingest/status/{job_id} for live progress. The extraction agent turns
+    the PDF into typed `hb-` entities; `replace` clears any prior import first."""
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a PDF.")
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file.")
 
-    removed = ingest.clear_ingested(db) if replace else 0
-    tmp_path = Path(tempfile.gettempdir()) / f"handbook-{uuid.uuid4().hex}.pdf"
-    try:
-        tmp_path.write_bytes(data)
-        report = ingest.ingest_pdf(db, tmp_path, source_label=label, actor=actor)
-    finally:
-        tmp_path.unlink(missing_ok=True)
-    report["replaced"] = removed
-    return report
+    job_id = uuid.uuid4().hex
+    tmp_path = Path(tempfile.gettempdir()) / f"handbook-{job_id}.pdf"
+    tmp_path.write_bytes(data)
+    _INGEST_JOBS[job_id] = {
+        "status": "running",
+        "phase": "Starting…",
+        "pages": 0,
+        "chunks_done": 0,
+        "chunks_total": 0,
+        "entities": 0,
+        "replaced": 0,
+    }
+    threading.Thread(
+        target=_run_ingest_job,
+        args=(job_id, tmp_path, label, actor, replace),
+        daemon=True,
+    ).start()
+    return {"job_id": job_id}
+
+
+@app.get("/ingest/status/{job_id}")
+def ingest_status(job_id: str) -> dict:
+    """Live progress for a handbook ingestion job (running | done | error)."""
+    job = _INGEST_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown ingest job.")
+    return job
 
 
 @app.get("/changelog")

@@ -171,19 +171,46 @@ export interface IngestReport {
   replaced?: number;
 }
 
+export interface IngestProgress {
+  status: "running" | "done" | "error";
+  phase: string;
+  pages: number;
+  chunks_done: number;
+  chunks_total: number;
+  entities: number;
+  replaced?: number;
+  report?: IngestReport;
+  error?: string;
+}
+
+/** Start a handbook ingestion job and poll it to completion, reporting live
+ *  progress via `onProgress`. Resolves with the final report. */
 export async function importHandbook(
   file: File,
+  onProgress?: (p: IngestProgress) => void,
   label?: string
 ): Promise<IngestReport> {
   const body = new FormData();
   body.append("file", file, file.name);
   if (label) body.append("label", label);
-  const res = await fetch("/api/ingest", { method: "POST", body });
-  if (!res.ok) {
-    const msg = await res.json().catch(() => ({}));
-    throw new Error(msg?.error ?? `ingest failed: ${res.status}`);
+
+  const start = await fetch("/api/ingest", { method: "POST", body });
+  if (!start.ok) {
+    const msg = await start.json().catch(() => ({}));
+    throw new Error(msg?.error ?? `ingest failed: ${start.status}`);
   }
-  return res.json();
+  const { job_id } = await start.json();
+
+  // Poll for progress until the job finishes.
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const res = await fetch(`/api/ingest/status/${job_id}`, { cache: "no-store" });
+    if (!res.ok) continue; // transient; keep polling
+    const p: IngestProgress = await res.json();
+    onProgress?.(p);
+    if (p.status === "done" && p.report) return p.report;
+    if (p.status === "error") throw new Error(p.error ?? "ingest failed");
+  }
 }
 
 // ---- Operator: knowledge-graph visualization ----

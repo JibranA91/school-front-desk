@@ -62,6 +62,7 @@ export default function OperatorView({
   const [ingesting, setIngesting] = useState(false);
   const [ingestReport, setIngestReport] = useState<IngestReport | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
+  const [ingestStatus, setIngestStatus] = useState("");
   const [graphToken, setGraphToken] = useState(0);
   const [inboxCount, setInboxCount] = useState<number | null>(null);
   const [inboxResetKey, setInboxResetKey] = useState(0);
@@ -77,8 +78,13 @@ export default function OperatorView({
     setIngesting(true);
     setIngestReport(null);
     setIngestError(null);
+    setIngestStatus("Uploading…");
     try {
-      const report = await importHandbook(file);
+      const report = await importHandbook(file, (p) => {
+        const found =
+          p.entities > 0 ? ` · ${p.entities} policies found` : "";
+        setIngestStatus(`${p.phase}${found}`);
+      });
       setIngestReport(report);
       refreshLog();
       setGraphToken((t) => t + 1);
@@ -86,6 +92,7 @@ export default function OperatorView({
       setIngestError(e instanceof Error ? e.message : "Import failed");
     } finally {
       setIngesting(false);
+      setIngestStatus("");
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -499,7 +506,7 @@ export default function OperatorView({
                 </button>
                 <div style={{ flex: 1, fontSize: "12.5px", color: "#737685" }}>
                   {ingesting
-                    ? "Extracting policies — this can take a minute for a full handbook."
+                    ? ingestStatus || "Starting…"
                     : "PDF only. Existing curated facts stay untouched."}
                 </div>
               </div>

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -378,8 +379,12 @@ def ingest_pdf(
     actor: str = "Handbook Import",
     max_pages: int | None = None,
     id_prefix: str = "hb-",
+    progress: Callable[[int, int, int, int], None] | None = None,
 ) -> dict:
     """Parse `path`, extract entities, and write them as new graph nodes.
+
+    `progress(chunks_done, chunks_total, entities_so_far, pages)` is invoked after
+    each section during the (slow) extraction pass, for live status reporting.
 
     Returns a report dict. Existing entities are never modified: ids collide only
     within this import, and we suffix to keep them distinct.
@@ -393,11 +398,13 @@ def ingest_pdf(
 
     extract = _extract_bedrock if settings.bedrock_enabled else _extract_heuristic
     raw: list[Extracted] = []
-    for ch in chunks:
+    for i, ch in enumerate(chunks):
         try:
             raw.extend(extract(ch))
         except Exception as exc:  # noqa: BLE001 — one bad chunk shouldn't sink the run
             print(f"  ! chunk pp.{ch.page_start}-{ch.page_end} failed: {exc}")
+        if progress:
+            progress(i + 1, len(chunks), len(raw), len(pages))
     items = _dedup(raw)
 
     # Reserve ids: avoid colliding with anything already in the graph.
