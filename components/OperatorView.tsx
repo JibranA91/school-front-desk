@@ -63,6 +63,7 @@ export default function OperatorView({
   const [ingestReport, setIngestReport] = useState<IngestReport | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
   const [ingestStatus, setIngestStatus] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [graphToken, setGraphToken] = useState(0);
   const [inboxCount, setInboxCount] = useState<number | null>(null);
   const [inboxResetKey, setInboxResetKey] = useState(0);
@@ -73,7 +74,19 @@ export default function OperatorView({
     refreshLog();
   }, []);
 
-  const onHandbookPicked = async (file: File | undefined) => {
+  // Picking a file opens a confirmation dialog rather than importing straight away.
+  const onHandbookPicked = (file: File | undefined) => {
+    if (file && !ingesting) setPendingFile(file);
+  };
+
+  const cancelImport = () => {
+    setPendingFile(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const confirmImport = async () => {
+    const file = pendingFile;
+    setPendingFile(null);
     if (!file || ingesting) return;
     setIngesting(true);
     setIngestReport(null);
@@ -1102,6 +1115,75 @@ export default function OperatorView({
           </div>
         )}
       </div>
+
+      {/* Import-handbook confirmation */}
+      {pendingFile && !ingesting && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(30,37,73,.55)",
+            display: "grid",
+            placeItems: "center",
+            padding: 24,
+            zIndex: 60,
+            animation: "fdUp .2s ease both",
+          }}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 22,
+              maxWidth: 480,
+              width: "100%",
+              boxShadow: "0 40px 80px -20px rgba(30,37,73,.5)",
+              padding: "24px 24px 20px",
+            }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#18181D", letterSpacing: "-.01em" }}>
+              Import this handbook?
+            </div>
+            <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 10, lineHeight: 1.5 }}>
+              The AI will read <b>{pendingFile.name}</b> and turn each policy into
+              cited entries parents can ask about. This <b>replaces</b> the
+              current imported handbook — your curated facts and manual edits are
+              kept. It can take up to a minute.
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button
+                onClick={cancelImport}
+                style={{
+                  background: "transparent",
+                  color: "#5C5E6A",
+                  border: "1px solid #EBEFF4",
+                  borderRadius: 11,
+                  padding: "10px 18px",
+                  fontSize: "13.5px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmImport}
+                style={{
+                  background: "#5463D6",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 11,
+                  padding: "10px 18px",
+                  fontSize: "13.5px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Import handbook
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Conflict modal */}
       {conflictOpen && (
