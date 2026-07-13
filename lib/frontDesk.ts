@@ -240,6 +240,63 @@ export async function fetchGraph(): Promise<KnowledgeGraph> {
   return res.json();
 }
 
+// ---- Operator: inspect / edit / delete knowledge entities ----
+
+export type EntityOrigin = "seed" | "authored" | "handbook";
+
+export interface KbEntityDetail {
+  id: string;
+  type: string;
+  name: string;
+  attributes: Record<string, unknown>;
+  sources: string[];
+  origin: EntityOrigin;
+  connections: number;
+  updated_at: string | null;
+}
+
+export const originStyles: Record<
+  EntityOrigin,
+  { bg: string; color: string; label: string }
+> = {
+  seed: { bg: "#EEF1FF", color: "#4B57B8", label: "Curated" },
+  authored: { bg: "#E7F7EE", color: "#227A47", label: "Operator" },
+  handbook: { bg: "#FFF1DE", color: "#B5710A", label: "Handbook" },
+};
+
+export async function fetchEntities(): Promise<KbEntityDetail[]> {
+  const res = await fetch("/api/entities", { cache: "no-store" });
+  if (!res.ok) throw new Error(`entities failed: ${res.status}`);
+  return res.json();
+}
+
+export async function updateEntity(
+  id: string,
+  patch: { name?: string; type?: string; attributes?: Record<string, unknown> }
+): Promise<{ ok: boolean; id: string }> {
+  const res = await fetch(`/api/entity/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({}));
+    throw new Error(msg?.error ?? `update failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deleteEntity(id: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/entity/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({}));
+    throw new Error(msg?.error ?? `delete failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 // ---- Operator: read a parent's thread + reply directly (no graph write) ----
 
 export interface Thread {

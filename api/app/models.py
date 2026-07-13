@@ -148,6 +148,9 @@ class ChangelogEntry(Base):
     after: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_diff: Mapped[bool] = mapped_column(Boolean, default=False)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Restorable entity state before this change ({"entity_id", "before"}), for
+    # one-click revert. NULL = not revertable (seed/handbook-bulk/legacy).
+    snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

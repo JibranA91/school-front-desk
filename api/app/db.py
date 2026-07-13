@@ -43,3 +43,6 @@ def init_db() -> None:
         conn.execute(
             text("ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS topic VARCHAR(40)")
         )
+        conn.execute(
+            text("ALTER TABLE changelog ADD COLUMN IF NOT EXISTS snapshot JSONB")
+        )

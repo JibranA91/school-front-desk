@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 import uuid
 
@@ -430,6 +431,165 @@ def graph(db: Session = Depends(get_db)) -> dict:
     ]
     edges = [{"source": r.src_id, "target": r.dst_id, "rel": r.rel} for r in rels]
     return {"nodes": nodes, "edges": edges}
+
+
+def _entity_origin(e: models.KbEntity) -> str:
+    """Where a fact came from — drives the inspector's filter + delete warning.
+    handbook: an imported `hb-` node; authored: created by an operator via the
+    authoring agent ('Set by …'); seed: the curated demo backbone."""
+    if e.id.startswith("hb-"):
+        return "handbook"
+    if any(str(s).startswith("Set by") for s in (e.sources or [])):
+        return "authored"
+    return "seed"
+
+
+def _entity_state(e: models.KbEntity) -> dict:
+    """A restorable snapshot of an entity — stored on the changelog so a change
+    can be reverted later (see /changelog/{id}/revert)."""
+    return {
+        "type": e.type,
+        "name": e.name,
+        "attributes": dict(e.attributes or {}),
+        "sources": list(e.sources or []),
+    }
+
+
+def _reembed(db: Session, e: models.KbEntity) -> None:
+    from app.embeddings import embed_texts, entity_text
+
+    e.embedding = embed_texts([entity_text(e)])[0]
+
+
+def _delete_entity_cascade(db: Session, e: models.KbEntity) -> None:
+    """Remove an entity and everything that references it: incident relationship
+    edges, and the FK link from any changelog rows (history is kept, unlinked)."""
+    db.query(models.KbRelationship).filter(
+        (models.KbRelationship.src_id == e.id) | (models.KbRelationship.dst_id == e.id)
+    ).delete(synchronize_session=False)
+    db.query(models.ChangelogEntry).filter(
+        models.ChangelogEntry.entity_id == e.id
+    ).update({models.ChangelogEntry.entity_id: None}, synchronize_session=False)
+    db.delete(e)
+
+
+@app.get("/entities")
+def list_entities(db: Session = Depends(get_db)) -> list[dict]:
+    """Full detail on every knowledge-graph node, for the operator's inspector —
+    attributes, sources, origin, and how many edges touch it."""
+    entities = db.scalars(select(models.KbEntity)).all()
+    rels = db.scalars(select(models.KbRelationship)).all()
+    deg: Counter = Counter()
+    for r in rels:
+        deg[r.src_id] += 1
+        deg[r.dst_id] += 1
+    out = [
+        {
+            "id": e.id,
+            "type": e.type,
+            "name": e.name,
+            "attributes": e.attributes or {},
+            "sources": e.sources or [],
+            "origin": _entity_origin(e),
+            "connections": deg.get(e.id, 0),
+            "updated_at": e.updated_at.isoformat() if e.updated_at else None,
+        }
+        for e in entities
+    ]
+    out.sort(key=lambda d: (d["type"], d["name"]))
+    return out
+
+
+class EntityPatchRequest(BaseModel):
+    name: str | None = None
+    type: str | None = None
+    attributes: dict | None = None  # full replacement of the attributes map
+    actor: str = "Operator"
+    actor_user_id: str | None = None
+
+
+@app.patch("/entity/{entity_id}")
+def update_entity(
+    entity_id: str, body: EntityPatchRequest, db: Session = Depends(get_db)
+) -> dict:
+    """Directly edit an entity's name/type/attributes (no LLM). Re-embeds so
+    retrieval stays fresh, and logs a revertable changelog entry."""
+    e = db.get(models.KbEntity, entity_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="Entity not found.")
+
+    before = _entity_state(e)
+    new_attrs = body.attributes if body.attributes is not None else dict(e.attributes or {})
+
+    # A representative diff for the changelog display (first changed attribute,
+    # else the name).
+    diff_before = diff_after = None
+    is_diff = False
+    for k in new_attrs:
+        if str(before["attributes"].get(k)) != str(new_attrs.get(k)):
+            diff_after = f"{k}: {new_attrs.get(k)}"
+            if k in before["attributes"]:
+                diff_before = f"{k}: {before['attributes'].get(k)}"
+                is_diff = True
+            break
+    if body.name is not None and body.name != e.name:
+        diff_before = diff_before or before["name"]
+        diff_after = diff_after or body.name
+        is_diff = True
+
+    if body.name is not None:
+        e.name = body.name
+    if body.type is not None:
+        e.type = body.type
+    if body.attributes is not None:
+        e.attributes = new_attrs
+        flag_modified(e, "attributes")
+    _reembed(db, e)
+
+    db.add(
+        models.ChangelogEntry(
+            actor=body.actor,
+            actor_user_id=_as_uuid(body.actor_user_id),
+            action=f"Edited {e.name}",
+            entity_id=e.id,
+            before=diff_before,
+            after=diff_after,
+            is_diff=is_diff,
+            snapshot={"entity_id": entity_id, "before": before},
+        )
+    )
+    db.commit()
+    return {"ok": True, "id": e.id}
+
+
+class ActorRequest(BaseModel):
+    actor: str = "Operator"
+    actor_user_id: str | None = None
+
+
+@app.delete("/entity/{entity_id}")
+def delete_entity(
+    entity_id: str, body: ActorRequest = ActorRequest(), db: Session = Depends(get_db)
+) -> dict:
+    """Remove an entity from the knowledge graph. Its incident edges go too;
+    changelog history is preserved. The deletion itself is revertable."""
+    e = db.get(models.KbEntity, entity_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="Entity not found.")
+    state = _entity_state(e)
+    _delete_entity_cascade(db, e)
+    db.add(
+        models.ChangelogEntry(
+            actor=body.actor,
+            actor_user_id=_as_uuid(body.actor_user_id),
+            action=f"Removed {state['name']}",
+            entity_id=None,  # entity no longer exists; id lives in the snapshot
+            is_diff=False,
+            snapshot={"entity_id": entity_id, "before": state},
+        )
+    )
+    db.commit()
+    return {"deleted": entity_id}
 
 
 def _asker_context(db: Session, inq: models.Inquiry) -> str:

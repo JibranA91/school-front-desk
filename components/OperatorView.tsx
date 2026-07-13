@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import EntityInspector from "@/components/EntityInspector";
 import InboxPanel from "@/components/InboxPanel";
 import KnowledgeGraph from "@/components/KnowledgeGraph";
 import {
@@ -970,6 +971,14 @@ export default function OperatorView({
                 </div>
               </div>
             )}
+
+            <EntityInspector
+              reloadToken={graphToken}
+              onChanged={() => {
+                refreshLog();
+                setGraphToken((t) => t + 1);
+              }}
+            />
 
             <KnowledgeGraph reloadToken={graphToken} />
           </div>
