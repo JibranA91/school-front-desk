@@ -24,18 +24,29 @@ class Settings(BaseSettings):
     # Auth — shared secret the `web` service uses to authenticate to this API.
     auth_shared_secret: str = "dev-shared-secret-change-me"
 
+    # Which chat backend to use: "bedrock" | "anthropic" | "mock" | "auto".
+    # auto = Bedrock if AWS creds resolve, else Anthropic if a key is set, else mock.
+    # Set LLM_PROVIDER=anthropic to use the Claude API even where AWS creds exist.
+    llm_provider: str = "auto"
+
     # AWS Bedrock. Creds resolve via the standard boto3 chain (env or ~/.aws).
     aws_region: str = "us-east-1"
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
-    # Explicit override: set USE_BEDROCK=true/false to force on/off; None = auto-detect.
+    # Legacy explicit override: USE_BEDROCK=true/false. Prefer LLM_PROVIDER now.
     use_bedrock: bool | None = None
+
+    # Anthropic Claude API (used when provider == "anthropic").
+    anthropic_api_key: str | None = None
 
     # Model ids (Bedrock inference profiles; env-overridable to enabled models).
     # Parent chat → Haiku (fast, cheap). Operator agents (author/cleanup) → Sonnet.
     bedrock_parent_model: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     bedrock_chat_model: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
+    # Anthropic-API model ids (plain, no inference-profile prefix/suffix).
+    anthropic_parent_model: str = "claude-haiku-4-5"
+    anthropic_chat_model: str = "claude-sonnet-4-5"
     embedding_dims: int = 1024
 
     # CORS — the web origin allowed to call this API.
@@ -58,12 +69,35 @@ class Settings(BaseSettings):
     retrieval_max_entities: int = 25  # safety cap on total injected entities
 
     @property
+    def provider(self) -> str:
+        """Resolved chat backend: 'bedrock', 'anthropic', or 'mock'."""
+        p = (self.llm_provider or "auto").lower()
+        if p in ("bedrock", "anthropic", "mock"):
+            return p
+        # Legacy USE_BEDROCK switch still honored when LLM_PROVIDER is unset/auto.
+        if self.use_bedrock is True:
+            return "bedrock"
+        if self.use_bedrock is False:
+            return "anthropic" if self.anthropic_api_key else "mock"
+        # Auto-detect: prefer an already-configured Bedrock (keeps existing
+        # installs unchanged), else Anthropic if a key is set, else mock.
+        if (self.aws_access_key_id and self.aws_secret_access_key) or _default_creds_available():
+            return "bedrock"
+        if self.anthropic_api_key:
+            return "anthropic"
+        return "mock"
+
+    @property
+    def llm_enabled(self) -> bool:
+        """True when a real chat model is available (Bedrock or Anthropic)."""
+        return self.provider in ("bedrock", "anthropic")
+
+    @property
     def bedrock_enabled(self) -> bool:
-        if self.use_bedrock is not None:
-            return self.use_bedrock
-        if self.aws_access_key_id and self.aws_secret_access_key:
-            return True
-        return _default_creds_available()
+        """Whether embeddings are served by Bedrock Titan. Only in bedrock mode —
+        the anthropic and mock paths use the offline mock embedder (Anthropic has
+        no embeddings API)."""
+        return self.provider == "bedrock"
 
 
 settings = Settings()

@@ -47,7 +47,12 @@ app.include_router(auth_router.router)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "bedrock": settings.bedrock_enabled}
+    return {
+        "status": "ok",
+        "provider": settings.provider,  # bedrock | anthropic | mock
+        "llm_enabled": settings.llm_enabled,
+        "embeddings": "titan" if settings.bedrock_enabled else "mock",
+    }
 
 
 @app.get("/center")

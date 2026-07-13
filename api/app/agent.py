@@ -502,6 +502,6 @@ def answer_question(
     it scopes the personalized live-data tool to that family. The mock path has no
     tool-calling, so it ignores it.
     """
-    if settings.bedrock_enabled:
+    if settings.llm_enabled:
         return _answer_bedrock(db, question, asker_id)
     return _answer_mock(db, question)
