@@ -24,6 +24,22 @@ export default function ParentView() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, typing]);
 
+  // While Sunny is thinking, cycle a random pre-K phrase every ~1.5s (avoiding
+  // an immediate repeat) so it visibly switches during a single response.
+  useEffect(() => {
+    if (!typing) return;
+    const pick = () =>
+      setLoadingPhrase((prev) => {
+        let next = prev;
+        while (next === prev && loadingPhrases.length > 1)
+          next = loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)];
+        return next;
+      });
+    pick();
+    const iv = setInterval(pick, 1500);
+    return () => clearInterval(iv);
+  }, [typing]);
+
   // Keep the transcript live: load on mount, poll for new staff replies, and
   // refresh on tab focus. Polling is skipped while a send is in flight so it
   // doesn't clobber the optimistic user/assistant bubbles. (DB-only endpoint,
@@ -59,9 +75,6 @@ export default function ParentView() {
     sendingRef.current = true;
     setMessages((s) => [...s, { id: uid, type: "user", text: t }]);
     setChatInput("");
-    setLoadingPhrase(
-      loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)],
-    );
     setTyping(true);
     try {
       const result = await askFrontDesk(t);
@@ -781,11 +794,9 @@ export default function ParentView() {
               </div>
               {loadingPhrase && (
                 <span
-                  style={{
-                    fontSize: "13.5px",
-                    color: "#6B7099",
-                    fontStyle: "italic",
-                  }}
+                  key={loadingPhrase}
+                  className="fd-shimmer"
+                  style={{ fontSize: "13.5px", fontWeight: 600 }}
                 >
                   {loadingPhrase}…
                 </span>

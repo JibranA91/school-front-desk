@@ -68,6 +68,25 @@ button:focus-visible {
     transform: rotate(360deg);
   }
 }
+@keyframes fdShimmer {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -150% 0;
+  }
+}
+
+/* Animated, shimmering loading phrase (Claude-Code-style status words). */
+.fd-shimmer {
+  background: linear-gradient(90deg, #a6abc9 22%, #5463d6 50%, #a6abc9 78%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+  animation: fdShimmer 1.8s linear infinite, fdUp 0.28s ease both;
+}
 @keyframes fdBlink {
   0%,
   60%,
