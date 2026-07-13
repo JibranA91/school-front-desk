@@ -52,11 +52,43 @@ def _searchable(entity=models.KbEntity):
     )
 
 
+def _lexical_search(db: Session, query: str, k: int) -> list[dict]:
+    """FTS-only ranking (settings.embeddings_enabled = False): score purely on
+    Postgres ts_rank_cd, no vector signal. Does NOT require entities to have an
+    embedding, and returns only entities that actually match the query (lex > 0)
+    so we never surface arbitrary rows when there's no keyword signal."""
+    tsv = func.to_tsvector(_TS_CONFIG, _searchable())
+    tsq = func.plainto_tsquery(_TS_CONFIG, query)
+    lexical = func.ts_rank_cd(tsv, tsq).label("lex")
+    rows = db.execute(select(models.KbEntity, lexical)).all()
+
+    max_lex = max((float(r.lex) for r in rows), default=0.0) or 1.0
+    scored = sorted(
+        ((float(lex) / max_lex, e) for e, lex in rows if float(lex) > 0.0),
+        key=lambda r: r[0],
+        reverse=True,
+    )
+    out = []
+    for lx, e in scored[:k]:
+        summary = _summary(e)
+        summary["score"] = round(lx, 4)
+        summary["semantic"] = 0.0
+        summary["lexical"] = round(lx, 4)
+        out.append(summary)
+    return out
+
+
 def search_graph(db: Session, query: str, k: int = 5) -> list[dict]:
     """Rank entities by a hybrid of semantic similarity (pgvector cosine) and
     lexical relevance (Postgres FTS ts_rank_cd). Both signals are computed in
     one SQL pass; ts_rank_cd is min-max normalized across the result set so it
-    blends sensibly with the 0..1 cosine similarity."""
+    blends sensibly with the 0..1 cosine similarity.
+
+    When `settings.embeddings_enabled` is False, the vector signal is skipped
+    entirely and results come from FTS alone (see `_lexical_search`)."""
+    if not settings.embeddings_enabled:
+        return _lexical_search(db, query, k)
+
     qvec = embed_query(query)
     semantic = (1.0 - models.KbEntity.embedding.cosine_distance(qvec)).label("sem")
     tsv = func.to_tsvector(_TS_CONFIG, _searchable())

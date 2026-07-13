@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     # knowledge base at a different store behind the same Retriever interface.
     retriever: str = "pgvector"
 
+    # Semantic (vector) retrieval. Set EMBEDDINGS_ENABLED=false to turn off the
+    # pgvector signal entirely and rank on Postgres full-text search alone —
+    # useful when embeddings are unavailable/untrusted (e.g. the Anthropic path's
+    # mock embedder), or to run leaner with no embedding provider at all.
+    embeddings_enabled: bool = True
+
     # The relevant subgraph is always pre-retrieved and injected into the parent
     # agent's context. When True, the agent ALSO gets knowledge-graph tools
     # (search_graph/get_entity/expand_neighbors) to look further; when False it
