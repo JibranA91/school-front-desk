@@ -5,6 +5,7 @@ import {
   askFrontDesk,
   chips,
   fetchHistory,
+  loadingPhrases,
   resultToMessage,
   type Msg,
 } from "@/lib/frontDesk";
@@ -13,6 +14,7 @@ export default function ParentView() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [loadingPhrase, setLoadingPhrase] = useState("");
   const [openSources, setOpenSources] = useState<number[]>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sendingRef = useRef(false); // pause polling mid-send to keep optimistic UI
@@ -57,6 +59,9 @@ export default function ParentView() {
     sendingRef.current = true;
     setMessages((s) => [...s, { id: uid, type: "user", text: t }]);
     setChatInput("");
+    setLoadingPhrase(
+      loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)],
+    );
     setTyping(true);
     try {
       const result = await askFrontDesk(t);
@@ -752,24 +757,39 @@ export default function ParentView() {
               style={{
                 alignSelf: "flex-start",
                 background: "#F1F4FF",
-                padding: "14px 16px",
+                padding: "13px 16px",
                 borderRadius: "18px 18px 18px 6px",
                 display: "flex",
-                gap: 5,
+                alignItems: "center",
+                gap: 10,
+                maxWidth: "86%",
               }}
             >
-              {[0, 0.2, 0.4].map((d) => (
+              <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                {[0, 0.2, 0.4].map((d) => (
+                  <span
+                    key={d}
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 999,
+                      background: "#8B93C9",
+                      animation: `fdBlink 1.2s infinite ${d}s`,
+                    }}
+                  />
+                ))}
+              </div>
+              {loadingPhrase && (
                 <span
-                  key={d}
                   style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: 999,
-                    background: "#8B93C9",
-                    animation: `fdBlink 1.2s infinite ${d}s`,
+                    fontSize: "13.5px",
+                    color: "#6B7099",
+                    fontStyle: "italic",
                   }}
-                />
-              ))}
+                >
+                  {loadingPhrase}…
+                </span>
+              )}
             </div>
           )}
         </div>
