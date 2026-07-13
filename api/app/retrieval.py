@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from sqlalchemy import Text, func, or_, select
+from sqlalchemy import Text, func, or_, select, text as sa_text
 from sqlalchemy.orm import Session
 
 from app import models
@@ -56,9 +56,18 @@ def _lexical_search(db: Session, query: str, k: int) -> list[dict]:
     """FTS-only ranking (settings.embeddings_enabled = False): score purely on
     Postgres ts_rank_cd, no vector signal. Does NOT require entities to have an
     embedding, and returns only entities that actually match the query (lex > 0)
-    so we never surface arbitrary rows when there's no keyword signal."""
+    so we never surface arbitrary rows when there's no keyword signal.
+
+    Uses OR-of-terms matching, not plainto_tsquery's all-terms AND: without a
+    semantic signal, requiring every non-stopword term rejected natural questions
+    on a single filler word (e.g. "how MUCH is infant tuition" AND-ed in `much`,
+    which no entity contains, so it matched nothing). We reuse plainto_tsquery's
+    tokenization/stemming/stopword removal, then flip `&` to `|` so any overlapping
+    term matches and ts_rank_cd rewards entities that cover more of them."""
     tsv = func.to_tsvector(_TS_CONFIG, _searchable())
-    tsq = func.plainto_tsquery(_TS_CONFIG, query)
+    tsq = sa_text(
+        f"replace(plainto_tsquery('{_TS_CONFIG}', :q)::text, ' & ', ' | ')::tsquery"
+    ).bindparams(q=query)
     lexical = func.ts_rank_cd(tsv, tsq).label("lex")
     rows = db.execute(select(models.KbEntity, lexical)).all()
 
