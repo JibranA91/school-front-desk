@@ -220,8 +220,16 @@ def _recent_turns(
         .order_by(models.Message.created_at.desc())
         .limit(turns * 2)  # a turn = user + assistant
     ).all()
+    # Back to chronological order. The user + assistant of one turn are persisted
+    # in the SAME transaction, so Postgres stamps both with an identical
+    # created_at (now() is the transaction time). Ordering by timestamp alone
+    # therefore can't keep the question before its answer within a turn — so
+    # tie-break on role (user first). Without this the model sees each answer
+    # before its question, treats the latest question as unanswered, and replies
+    # one turn behind.
+    rows.sort(key=lambda m: (m.created_at, 0 if m.role == "user" else 1))
     history: list[dict] = []
-    for m in reversed(rows):  # back to chronological order
+    for m in rows:
         c = m.content or {}
         if m.kind == "user":
             text = c.get("text") or ""
