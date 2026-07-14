@@ -6,7 +6,7 @@ agent must never give a confident, grounded answer to a **sensitive** or
 **unknown / out-of-scope** question. A safe escalation is an acceptable miss; a
 confident wrong answer is the failure that sinks trust.
 
-Four harnesses, cheapest first:
+Five harnesses, cheapest first:
 
 | Harness | LLM? | Scores |
 |---|---|---|
@@ -14,6 +14,7 @@ Four harnesses, cheapest first:
 | `menu_evals.py` | yes | live menu *content* correctness across days |
 | `run_evals.py` | yes | escalation *decision* + grounding over the hand-curated question set |
 | `handbook_evals.py` | yes | *retrieval recall / coverage* across the whole ingested handbook |
+| `handbook_judge_evals.py` | yes (+judge) | *answer correctness* (LLM-judge) — the fair way to compare retrieval modes |
 
 ## Files
 - `dataset.json` — labeled cases. Each has an `expected` decision:
@@ -135,6 +136,26 @@ handbook fact, does the agent surface *and cite the right one*?"
 Recall reflects the active retrieval mode — expect it higher in `hybrid` than in
 `fts-only`. A recall "miss" is often the agent answering correctly from an equally
 valid source (e.g. center info) rather than the single expected entity.
+
+## Answer-correctness eval (`handbook_judge_evals.py`)
+
+`handbook_evals.py` scores *which entity* was cited — which is unfair on a KB
+with near-duplicate facts (the agent can cite an equally-valid sibling). This one
+uses an **LLM judge** to score whether the *answer* is factually correct against
+the handbook fact, ignoring citation identity — the apples-to-apples way to
+compare retrieval modes. Run it under each mode and compare the correct rate:
+
+```
+uv run python evals/handbook_judge_evals.py                          # live config
+EMBEDDINGS_ENABLED=false uv run python evals/handbook_judge_evals.py  # force fts-only
+```
+
+Example (Voyage embeddings vs. fts-only, same set): **48% vs 42% correct**, 0
+safety breaches either way — a modest, real lift. Two caveats keep this honest:
+the judge grades against one specific entity's body (near-duplicate siblings
+still cost points), and the auto-generated questions lexically overlap their
+source entity, which flatters lexical/FTS — so semantic retrieval's true edge
+(paraphrased, keyword-free queries) is *under*-represented here.
 
 ## Notes / known limitations
 - The LLM path is **non-deterministic**: borderline answerable questions (e.g.
