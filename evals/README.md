@@ -6,6 +6,14 @@ agent must never give a confident, grounded answer to a **sensitive** or
 **unknown / out-of-scope** question. A safe escalation is an acceptable miss; a
 confident wrong answer is the failure that sinks trust.
 
+Three harnesses, cheapest first:
+
+| Harness | LLM? | Scores |
+|---|---|---|
+| `escalation_evals.py` | no (ms) | the sensitive-topic classifier — false negatives / false positives |
+| `menu_evals.py` | yes | live menu *content* correctness across days |
+| `run_evals.py` | yes | escalation *decision* + grounding over the full question set |
+
 ## Files
 - `dataset.json` — labeled cases. Each has an `expected` decision:
   - `answer` — a grounded, cited answer is expected (incl. grounded *negative*
@@ -36,6 +44,35 @@ test but not representative of the shipped behavior.
 - **Over-escalation** — answerable questions that were punted (the *safe* error).
 - **Latency** — avg / p95 per query.
 
+## Escalation-classifier eval (`escalation_evals.py`)
+
+The fastest and most targeted harness — **no LLM, no DB, runs in milliseconds**.
+It pins `app.escalation.classify_sensitive`, the deterministic keyword safety net
+that force-escalates sensitive questions regardless of the model. Because it's a
+keyword matcher, it's exactly where a subtle bug hides: matching keywords as raw
+*substrings* once mis-escalated *"what will be for lunch tomorrow?"* as health
+(**"will"** contains **"ill"**) and *"is the daycare licensed?"* (**"licensed"** →
+**"lice"**). This eval guards both directions:
+
+- `escalation_dataset.json` — `sensitive` cases (must classify to the right
+  category), `benign` cases (must return null), and **`trap`** cases: benign
+  questions that contain a sensitive keyword as a substring (`will`, `licensed`,
+  `fellow`, `refill`, `still`, `skills`, `influence`).
+- Headline metrics: **false negatives** (missed a sensitive topic — 0) and
+  **false positives** (escalated a benign question — 0). Exits non-zero on any
+  failure, so it can gate CI.
+
+```
+api/.venv/Scripts/python.exe evals/escalation_evals.py
+```
+
+The classifier matches keywords at **word boundaries** (a base form also catches
+its inflections: `fever`→`feverish`, `cough`→`coughing`); the few short keywords
+that are prefixes of common words (`ill`, `flu`, `lice`, `fell`, `fall`) match as
+whole words only. Note `fall` still fires on "fall festival" — an accepted
+over-escalation, since erring toward escalation on a possible injury report is
+the safe direction.
+
 ## Menu-accuracy eval (`menu_evals.py`)
 
 A second, focused harness for the **live lunch menu** across days — the one place
@@ -59,10 +96,14 @@ scores the escalation *decision*, this scores answer *content*:
 
 Run (same as above):
 ```
-api/.venv/Scripts/python.exe evals/menu_evals.py
+api/.venv/Scripts/python.exe evals/menu_evals.py            # 3 samples/case (default)
+api/.venv/Scripts/python.exe evals/menu_evals.py --samples 5
 ```
-The current week's menu is seeded idempotently at the start, so the set is
-self-contained. It seeds only `menu_days` and calls `answer_question`
+Each case is run `--samples` times because the LLM path is non-deterministic: a
+case that passes on one roll and fails on another is reported as **FLAKY** (the
+worst sample decides the verdict), which catches intermittent misfires a single
+run would miss. The current week's menu is seeded idempotently at the start, so
+the set is self-contained. It seeds only `menu_days` and calls `answer_question`
 in-process, so it does **not** touch the knowledge graph or the operator inbox.
 
 ## Notes / known limitations

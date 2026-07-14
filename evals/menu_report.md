@@ -1,33 +1,36 @@
 # Menu-accuracy eval report
 
-- Run: 2026-07-14 02:58 UTC (server date 2026-07-13, a Monday)
+- Run: 2026-07-14 03:17 UTC (server date 2026-07-13, a Monday)
 - Agent mode: Bedrock (real LLM)
 - Retrieval: hybrid
-- Cases: 10
+- Cases: 12 · samples/case: 3
 
 ## Headline
 
 - **Fabricated a menu for an unposted day: 0 (target 0)** ✅
 - **Leaked another day's dish: 0 (target 0)** ✅
-- Passed (right day, grounded, no leak): **8/10** (80%)
-- Safe (honest but imperfect): 2/10
-- Failed: 0/10
-- Latency — avg 4310 ms, p95 5119 ms
+- Passed (right day, grounded, no leak, on every sample): **10/12** (83%)
+- Safe (honest but imperfect): 2/12
+- Failed: 0/12
+- Flaky (verdict split across 3 samples): 0/12
+- Latency — avg 4177 ms, p95 4835 ms
 
 ## All cases
 
-| ✓ | id | question | target → day | expected dish | grounded | ms | note |
-|---|----|----------|--------------|---------------|----------|----|------|
-| ✅ | menu-today | What's for lunch today? | Monday (2026-07-13) | turkey | yes | 6078 |  |
-| ✅ | menu-tomorrow | What's on the menu for lunch tomorrow? | Tuesday (2026-07-14) | quesadilla | yes | 4581 |  |
-| ✅ | menu-monday | What are you serving for lunch on Monday? | monday (2026-07-13) | turkey | yes | 4407 |  |
-| ✅ | menu-tuesday | What's Tuesday's lunch? | tuesday (2026-07-14) | quesadilla | yes | 3920 |  |
-| ✅ | menu-wednesday | What is lunch this Wednesday? | wednesday (2026-07-15) | pasta | yes | 3348 |  |
-| ✅ | menu-thursday | What's for lunch on Thursday? | thursday (2026-07-16) | chicken | yes | 4333 |  |
-| ✅ | menu-friday | What are the kids having for lunch Friday? | friday (2026-07-17) | pizza | yes | 4095 |  |
-| ✅ | menu-week | Can you tell me the whole week's lunch menu? | week ((week)) | all 5 | yes | 5119 |  |
-| 🟡 | menu-saturday | What's for lunch on Saturday? | saturday (2026-07-18) | (none posted) | no | 3431 | safely escalated to staff (ideal: state the center is closed weekends) |
-| 🟡 | menu-sunday | Is there a lunch menu this Sunday? | sunday (2026-07-19) | (none posted) | no | 3789 | safely escalated to staff (ideal: state the center is closed weekends) |
+| ✓ | id | question | target → day | expected dish | grounded | pass | ms | note |
+|---|----|----------|--------------|---------------|----------|------|----|------|
+| ✅ | menu-today | What's for lunch today? | Monday (2026-07-13) | turkey | yes | 3/3 | 4835 |  |
+| ✅ | menu-today-alt | what are the kids eating for lunch today? | Monday (2026-07-13) | turkey | yes | 3/3 | 4371 |  |
+| ✅ | menu-tomorrow | What's on the menu for lunch tomorrow? | Tuesday (2026-07-14) | quesadilla | yes | 3/3 | 4653 |  |
+| ✅ | menu-tomorrow-will | what will be for lunch tomorrow? | Tuesday (2026-07-14) | quesadilla | yes | 3/3 | 4701 |  |
+| ✅ | menu-monday | What are you serving for lunch on Monday? | monday (2026-07-13) | turkey | yes | 3/3 | 4321 |  |
+| ✅ | menu-tuesday | What's Tuesday's lunch? | tuesday (2026-07-14) | quesadilla | yes | 3/3 | 3564 |  |
+| ✅ | menu-wednesday | What is lunch this Wednesday? | wednesday (2026-07-15) | pasta | yes | 3/3 | 3851 |  |
+| ✅ | menu-thursday | What's for lunch on Thursday? | thursday (2026-07-16) | chicken | yes | 3/3 | 4097 |  |
+| ✅ | menu-friday | What are the kids having for lunch Friday? | friday (2026-07-17) | pizza | yes | 3/3 | 3555 |  |
+| ✅ | menu-week | Can you tell me the whole week's lunch menu? | week ((week)) | all 5 | yes | 3/3 | 5081 |  |
+| 🟡 | menu-saturday | What's for lunch on Saturday? | saturday (2026-07-18) | (none posted) | no | 0/3 | 3578 | safely escalated to staff (ideal: state the center is closed weekends) |
+| 🟡 | menu-sunday | Is there a lunch menu this Sunday? | sunday (2026-07-19) | (none posted) | no | 0/3 | 3522 | safely escalated to staff (ideal: state the center is closed weekends) |
 
 ## Answers (for eyeballing)
 
@@ -35,8 +38,16 @@
 → Today's lunch is a turkey & cheese sandwich, crisp apple slices, and whole milk.  
 _cited: ['live:menu']_
 
+**menu-today-alt** — _what are the kids eating for lunch today?_  
+→ Today's lunch includes a turkey & cheese sandwich, crisp apple slices, and whole milk.  
+_cited: ['live:menu']_
+
 **menu-tomorrow** — _What's on the menu for lunch tomorrow?_  
 → Tomorrow (Tuesday, July 14) we're serving: Cheese quesadilla, Black beans & corn, Orange wedges, and Whole milk.  
+_cited: ['live:menu-week']_
+
+**menu-tomorrow-will** — _what will be for lunch tomorrow?_  
+→ Tomorrow (Tuesday, July 14) for lunch we're serving: Cheese quesadilla, Black beans & corn, Orange wedges, and Whole milk.  
 _cited: ['live:menu-week']_
 
 **menu-monday** — _What are you serving for lunch on Monday?_  

@@ -8,8 +8,10 @@
     "week": "the whole Mon-Fri menu — the answer should cover all five days."
   },
   "cases": [
-    { "id": "menu-today",     "question": "What's for lunch today?",                        "target": "today" },
-    { "id": "menu-tomorrow",  "question": "What's on the menu for lunch tomorrow?",         "target": "tomorrow" },
+    { "id": "menu-today",       "question": "What's for lunch today?",                      "target": "today" },
+    { "id": "menu-today-alt",   "question": "what are the kids eating for lunch today?",    "target": "today" },
+    { "id": "menu-tomorrow",    "question": "What's on the menu for lunch tomorrow?",       "target": "tomorrow" },
+    { "id": "menu-tomorrow-will","question": "what will be for lunch tomorrow?",            "target": "tomorrow", "note": "Regression guard: 'will' contains 'ill' — used to be force-escalated as health by the substring classifier." },
     { "id": "menu-monday",    "question": "What are you serving for lunch on Monday?",      "target": "monday" },
     { "id": "menu-tuesday",   "question": "What's Tuesday's lunch?",                        "target": "tuesday" },
     { "id": "menu-wednesday", "question": "What is lunch this Wednesday?",                   "target": "wednesday" },

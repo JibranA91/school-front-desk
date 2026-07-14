@@ -27,6 +27,7 @@ Run (DB up, AWS creds present for the real agent):
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -148,7 +149,40 @@ def grade(target: str, day: date | None, items: list[str] | None,
     return "PASS", "", detail
 
 
+# Worst-wins ordering when aggregating repeated samples of one case.
+_VERDICT_RANK = {"PASS": 0, "SAFE": 1, "FAIL": 2}
+
+
+def run_sample(db, c: dict, day: date | None, items: list[str] | None) -> dict:
+    """Run one case through the agent once and grade it."""
+    t0 = time.perf_counter()
+    try:
+        result = agent.answer_question(db, c["question"])
+        err = None
+    except Exception as exc:  # noqa: BLE001
+        result, err = {}, str(exc)
+    ms = round((time.perf_counter() - t0) * 1000)
+    answer = result.get("answer") or ""
+    citations = result.get("citations") or []
+    grounded = any(str(x).startswith("live:menu") for x in citations)
+    escalated = bool(result.get("needs_escalation"))
+    if err:
+        verdict, note, detail = "FAIL", err, {}
+    else:
+        verdict, note, detail = grade(c["target"], day, items, answer, grounded, escalated)
+    return {"verdict": verdict, "note": note, "detail": detail, "ms": ms,
+            "answer": answer, "citations": citations, "grounded": grounded}
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Menu-accuracy eval.")
+    parser.add_argument(
+        "--samples", type=int, default=3,
+        help="Runs per case. >1 catches non-deterministic misfires (a case that "
+             "passes on one roll and fails on another shows up as FLAKY). Default 3.",
+    )
+    n = max(1, parser.parse_args().samples)
+
     _assert_signature_covers_seed()
     with open(os.path.join(HERE, "menu_dataset.json"), encoding="utf-8") as f:
         cases = json.load(f)["cases"]
@@ -164,21 +198,17 @@ def main() -> None:
         for c in cases:
             day = resolve_date(c["target"], today)
             items = menu_for(db, day) if day else None
-            t0 = time.perf_counter()
-            try:
-                result = agent.answer_question(db, c["question"])
-                err = None
-            except Exception as exc:  # noqa: BLE001
-                result, err = {}, str(exc)
-            ms = round((time.perf_counter() - t0) * 1000)
-            answer = result.get("answer") or ""
-            citations = result.get("citations") or []
-            grounded = any(str(x).startswith("live:menu") for x in citations)
-            escalated = bool(result.get("needs_escalation"))
-            if err:
-                verdict, note, detail = "FAIL", err, {}
-            else:
-                verdict, note, detail = grade(c["target"], day, items, answer, grounded, escalated)
+            samples = [run_sample(db, c, day, items) for _ in range(n)]
+
+            # Worst sample decides the case; a split across samples = FLAKY.
+            worst = max(samples, key=lambda s: _VERDICT_RANK[s["verdict"]])
+            verdicts = [s["verdict"] for s in samples]
+            passes = verdicts.count("PASS")
+            note = worst["note"]
+            if len(set(verdicts)) > 1:
+                dist = ", ".join(f"{v}×{verdicts.count(v)}" for v in ("PASS", "SAFE", "FAIL") if v in verdicts)
+                note = f"FLAKY [{dist}]" + (f" — {worst['note']}" if worst["note"] else "")
+
             rows.append({
                 "id": c["id"],
                 "question": c["question"],
@@ -186,25 +216,29 @@ def main() -> None:
                 "day": day.isoformat() if day else "(week)",
                 "weekday": day.strftime("%A") if day else "(week)",
                 "expected": (SIGNATURE.get(items[0]) if items else ("all 5" if c["target"] == "week" else "(none posted)")),
-                "citations": citations,
-                "grounded": grounded,
-                "answer": answer,
-                "verdict": verdict,
+                "citations": worst["citations"],
+                "grounded": worst["grounded"],
+                "answer": worst["answer"],
+                "verdict": worst["verdict"],
                 "note": note,
-                "detail": detail,
-                "ms": ms,
+                "detail": worst["detail"],
+                "ms": round(sum(s["ms"] for s in samples) / n),
+                "passes": passes,
+                "samples": n,
+                "flaky": len(set(verdicts)) > 1,
             })
     finally:
         db.close()
 
-    write_report(rows, today)
+    write_report(rows, today, n)
 
 
-def write_report(rows: list[dict], today: date) -> None:
+def write_report(rows: list[dict], today: date, samples: int) -> None:
     total = len(rows)
     passed = sum(1 for r in rows if r["verdict"] == "PASS")
     safe = sum(1 for r in rows if r["verdict"] == "SAFE")
     failed = [r for r in rows if r["verdict"] == "FAIL"]
+    flaky = [r for r in rows if r.get("flaky")]
     # The safety failure for menus: inventing food for a day that has none.
     fabrications = [r for r in rows if "fabricated" in (r["note"] or "")]
     leaks = [r for r in rows if "leaked" in (r["note"] or "")]
@@ -222,7 +256,7 @@ def write_report(rows: list[dict], today: date) -> None:
                  f"(server date {today:%Y-%m-%d}, a {today:%A})")
     lines.append(f"- Agent mode: {'Bedrock (real LLM)' if settings.bedrock_enabled else settings.provider}")
     lines.append(f"- Retrieval: {'hybrid' if settings.embeddings_enabled else 'fts-only'}")
-    lines.append(f"- Cases: {total}")
+    lines.append(f"- Cases: {total} · samples/case: {samples}")
     lines.append("")
     lines.append("## Headline")
     lines.append("")
@@ -230,9 +264,10 @@ def write_report(rows: list[dict], today: date) -> None:
                  f"{'✅' if not fabrications else '❌'}")
     lines.append(f"- **Leaked another day's dish: {len(leaks)} (target 0)** "
                  f"{'✅' if not leaks else '❌'}")
-    lines.append(f"- Passed (right day, grounded, no leak): **{passed}/{total}** ({pct(passed, total)})")
+    lines.append(f"- Passed (right day, grounded, no leak, on every sample): **{passed}/{total}** ({pct(passed, total)})")
     lines.append(f"- Safe (honest but imperfect): {safe}/{total}")
     lines.append(f"- Failed: {len(failed)}/{total}")
+    lines.append(f"- Flaky (verdict split across {samples} samples): {len(flaky)}/{total}")
     lines.append(f"- Latency — avg {avg_ms} ms, p95 {p95_ms} ms")
     lines.append("")
 
@@ -245,8 +280,8 @@ def write_report(rows: list[dict], today: date) -> None:
 
     lines.append("## All cases")
     lines.append("")
-    lines.append("| ✓ | id | question | target → day | expected dish | grounded | ms | note |")
-    lines.append("|---|----|----------|--------------|---------------|----------|----|------|")
+    lines.append("| ✓ | id | question | target → day | expected dish | grounded | pass | ms | note |")
+    lines.append("|---|----|----------|--------------|---------------|----------|------|----|------|")
     mark = {"PASS": "✅", "SAFE": "🟡", "FAIL": "❌"}
     for r in rows:
         q = r["question"].replace("|", "\\|")
@@ -254,7 +289,8 @@ def write_report(rows: list[dict], today: date) -> None:
         day = r["weekday"] if r["target"] in ("today", "tomorrow") else r["target"]
         lines.append(
             f"| {mark.get(r['verdict'], '?')} | {r['id']} | {q} | {day} "
-            f"({r['day']}) | {r['expected']} | {'yes' if r['grounded'] else 'no'} | {r['ms']} | {note} |"
+            f"({r['day']}) | {r['expected']} | {'yes' if r['grounded'] else 'no'} | "
+            f"{r.get('passes', '?')}/{r.get('samples', samples)} | {r['ms']} | {note} |"
         )
     lines.append("")
     lines.append("## Answers (for eyeballing)")
@@ -279,6 +315,7 @@ def write_report(rows: list[dict], today: date) -> None:
     print(f"  Passed:  {passed}/{total} ({pct(passed, total)})")
     print(f"  Safe:    {safe}/{total}")
     print(f"  Failed:  {len(failed)}/{total}")
+    print(f"  Flaky:   {len(flaky)}/{total}  (across {samples} samples/case)")
     print(f"  Latency avg/p95: {avg_ms} / {p95_ms} ms")
     print(f"\n  Report written to evals/menu_report.md")
     for r in rows:

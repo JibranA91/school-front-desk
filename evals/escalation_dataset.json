@@ -1,0 +1,36 @@
+{
+  "description": "Golden set for the deterministic sensitive-topic classifier (app.escalation.classify_sensitive). This is the code-level safety net that force-escalates sensitive questions regardless of the model. Two kinds of case: `sensitive` (must classify to the given category) and `benign` (must return null). The `trap` cases are benign questions that contain a sensitive keyword as a SUBSTRING ('will' contains 'ill', 'licensed' contains 'lice') — they guard against the substring-matching false positives that mis-escalated real questions. No LLM: this runs in milliseconds and is fully deterministic.",
+  "cases": [
+    { "id": "sens-fever",       "text": "My child has a fever, can she come in?",           "expected": "health" },
+    { "id": "sens-feverish",    "text": "She feels feverish this morning",                  "expected": "health" },
+    { "id": "sens-ill",         "text": "My son is ill today",                              "expected": "health" },
+    { "id": "sens-illness",     "text": "She's had an illness all week",                    "expected": "health" },
+    { "id": "sens-cough",       "text": "He keeps coughing, is that okay?",                 "expected": "health" },
+    { "id": "sens-vomit",       "text": "My daughter threw up last night",                  "expected": "health" },
+    { "id": "sens-medication",  "text": "Can you give my child medication during the day?", "expected": "medication" },
+    { "id": "sens-tylenol",     "text": "What is your tylenol dosage policy?",              "expected": "medication" },
+    { "id": "sens-allergy",     "text": "My child has a peanut allergy",                    "expected": "allergy" },
+    { "id": "sens-allergies",   "text": "She has several food allergies",                   "expected": "allergy" },
+    { "id": "sens-anaphylaxis", "text": "He is at risk of anaphylaxis",                     "expected": "allergy" },
+    { "id": "sens-fell",        "text": "My child fell and hit their head",                 "expected": "safety" },
+    { "id": "sens-fall",        "text": "She took a bad fall on the playground",            "expected": "safety" },
+    { "id": "sens-injury",      "text": "There was an injury, she's bleeding",              "expected": "safety" },
+    { "id": "sens-billing",     "text": "I want to dispute a charge on my invoice",         "expected": "billing_dispute" },
+    { "id": "sens-overcharge",  "text": "You overcharged me last month",                    "expected": "billing_dispute" },
+    { "id": "sens-custody",     "text": "My ex is not allowed to pick up my child",         "expected": "custody" },
+    { "id": "sens-courtorder",  "text": "There is a court order about custody",             "expected": "custody" },
+
+    { "id": "trap-will",        "text": "what will be for lunch tomorrow?",                 "expected": null, "trap": "'will' contains 'ill'" },
+    { "id": "trap-licensed",    "text": "Is the daycare licensed?",                         "expected": null, "trap": "'licensed' contains 'lice'" },
+    { "id": "trap-fellow",      "text": "My fellow parents recommended you",                "expected": null, "trap": "'fellow' contains 'fell'" },
+    { "id": "trap-refill",      "text": "Can I get a refill on the water bottle?",          "expected": null, "trap": "'refill' contains 'ill'" },
+    { "id": "trap-still",       "text": "Do you offer a still-life art class?",             "expected": null, "trap": "'still' contains 'ill'" },
+    { "id": "trap-skills",      "text": "What skills will my child develop here?",          "expected": null, "trap": "'skills'/'will' both contain 'ill'" },
+    { "id": "trap-influence",   "text": "Do the older kids influence the younger ones?",    "expected": null, "trap": "'influence' contains 'flu'" },
+
+    { "id": "ben-hours",        "text": "What are your hours?",                             "expected": null },
+    { "id": "ben-tuition",      "text": "How much is infant tuition?",                      "expected": null },
+    { "id": "ben-tour",         "text": "Can I book a tour for next Tuesday?",              "expected": null },
+    { "id": "ben-lunch",        "text": "What's for lunch today?",                          "expected": null }
+  ]
+}
