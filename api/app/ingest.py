@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import re
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -402,14 +403,36 @@ def ingest_pdf(
     # Use the LLM extractor whenever a real chat model is available (Bedrock OR
     # Anthropic); fall back to the offline heuristic only in mock mode.
     extract = _extract_llm if settings.llm_enabled else _extract_heuristic
-    raw: list[Extracted] = []
-    for i, ch in enumerate(chunks):
-        try:
-            raw.extend(extract(ch))
-        except Exception as exc:  # noqa: BLE001 — one bad chunk shouldn't sink the run
-            print(f"  ! chunk pp.{ch.page_start}-{ch.page_end} failed: {exc}")
-        if progress:
-            progress(i + 1, len(chunks), len(raw), len(pages))
+    if settings.llm_enabled:
+        # Warm the shared, cached chat model once so the worker threads all hit
+        # the cache instead of racing to build a client on first use.
+        from app.llm import get_chat_model
+
+        get_chat_model(settings.bedrock_chat_model, max_tokens=4096)
+
+    # Sections are independent (dedup + linking happen afterward), so extract
+    # them concurrently — a handful of workers turns N sequential model calls
+    # into ~N/workers of wall-clock time. Bounded to respect provider rate
+    # limits. Threads suit the I/O-bound model calls, and extraction touches no
+    # DB session; results are collected on THIS thread, so `raw` and `progress`
+    # stay single-threaded. Per-section errors are isolated. Results are kept in
+    # chunk order for deterministic output.
+    results: list[list[Extracted]] = [[] for _ in chunks]
+    workers = min(6, len(chunks)) or 1
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(extract, ch): idx for idx, ch in enumerate(chunks)}
+        for fut in as_completed(futures):
+            idx = futures[fut]
+            ch = chunks[idx]
+            try:
+                results[idx] = fut.result()
+            except Exception as exc:  # noqa: BLE001 — one bad section shouldn't sink the run
+                print(f"  ! chunk pp.{ch.page_start}-{ch.page_end} failed: {exc}")
+            done += 1
+            if progress:
+                progress(done, len(chunks), sum(len(r) for r in results), len(pages))
+    raw: list[Extracted] = [e for r in results for e in r]
     items = _dedup(raw)
 
     # Reserve ids: avoid colliding with anything already in the graph.
