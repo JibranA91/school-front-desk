@@ -236,9 +236,6 @@ button:focus-visible {
   background: #eef1ff !important;
   border-color: #6476ff !important;
 }
-.fd-mic:hover {
-  color: #5463d6 !important;
-}
 .fd-send:hover {
   background: #6476ff !important;
 }

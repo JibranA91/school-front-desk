@@ -944,7 +944,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
               background: "#F7F9FB",
               border: "1px solid #EBEFF4",
               borderRadius: 999,
-              padding: "0 6px 0 16px",
+              padding: "0 16px",
             }}
           >
             <input
@@ -967,36 +967,6 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                 outline: "none",
               }}
             />
-            <button
-              className="fd-mic"
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 999,
-                border: "none",
-                background: "transparent",
-                color: "#737685",
-                display: "grid",
-                placeItems: "center",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" x2="12" y1="19" y2="22" />
-              </svg>
-            </button>
           </div>
           <button
             className="fd-send"
