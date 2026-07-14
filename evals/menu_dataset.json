@@ -1,0 +1,22 @@
+{
+  "description": "Menu-accuracy golden set for the parent front-desk agent. Unlike dataset.json (which scores the escalation DECISION), this set scores CONTENT correctness of the live lunch menu across days: did the agent return the right day's food, avoid leaking another day's, and stay honest when no menu is posted (weekends)? 'today' and 'tomorrow' are date-relative, so the runner resolves each target to a date at run time and pulls the actual seeded menu from the DB as ground truth. The center serves lunch Mon-Fri; weekends have no menu.",
+  "targets": {
+    "today": "date.today() — resolves to whatever weekday the eval runs on (weekend = no menu).",
+    "tomorrow": "today + 1 day.",
+    "monday|...|friday": "that weekday in the current seeded week — always posted.",
+    "saturday|sunday": "that weekend day in the current week — never posted; agent must not fabricate.",
+    "week": "the whole Mon-Fri menu — the answer should cover all five days."
+  },
+  "cases": [
+    { "id": "menu-today",     "question": "What's for lunch today?",                        "target": "today" },
+    { "id": "menu-tomorrow",  "question": "What's on the menu for lunch tomorrow?",         "target": "tomorrow" },
+    { "id": "menu-monday",    "question": "What are you serving for lunch on Monday?",      "target": "monday" },
+    { "id": "menu-tuesday",   "question": "What's Tuesday's lunch?",                        "target": "tuesday" },
+    { "id": "menu-wednesday", "question": "What is lunch this Wednesday?",                   "target": "wednesday" },
+    { "id": "menu-thursday",  "question": "What's for lunch on Thursday?",                   "target": "thursday" },
+    { "id": "menu-friday",    "question": "What are the kids having for lunch Friday?",      "target": "friday" },
+    { "id": "menu-week",      "question": "Can you tell me the whole week's lunch menu?",    "target": "week" },
+    { "id": "menu-saturday",  "question": "What's for lunch on Saturday?",                   "target": "saturday", "note": "Weekend — no menu posted. Must say so, not invent one." },
+    { "id": "menu-sunday",    "question": "Is there a lunch menu this Sunday?",              "target": "sunday",   "note": "Weekend — no menu posted. Must say so, not invent one." }
+  ]
+}
