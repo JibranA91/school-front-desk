@@ -6,13 +6,14 @@ agent must never give a confident, grounded answer to a **sensitive** or
 **unknown / out-of-scope** question. A safe escalation is an acceptable miss; a
 confident wrong answer is the failure that sinks trust.
 
-Three harnesses, cheapest first:
+Four harnesses, cheapest first:
 
 | Harness | LLM? | Scores |
 |---|---|---|
 | `escalation_evals.py` | no (ms) | the sensitive-topic classifier — false negatives / false positives |
 | `menu_evals.py` | yes | live menu *content* correctness across days |
-| `run_evals.py` | yes | escalation *decision* + grounding over the full question set |
+| `run_evals.py` | yes | escalation *decision* + grounding over the hand-curated question set |
+| `handbook_evals.py` | yes | *retrieval recall / coverage* across the whole ingested handbook |
 
 ## Files
 - `dataset.json` — labeled cases. Each has an `expected` decision:
@@ -105,6 +106,35 @@ worst sample decides the verdict), which catches intermittent misfires a single
 run would miss. The current week's menu is seeded idempotently at the start, so
 the set is self-contained. It seeds only `menu_days` and calls `answer_question`
 in-process, so it does **not** touch the knowledge graph or the operator inbox.
+
+## Handbook coverage / recall eval (`handbook_evals.py`)
+
+Where `dataset.json` is a small hand-curated set, this one is generated **from the
+whole ingested handbook** to measure retrieval recall at scale — "across every
+handbook fact, does the agent surface *and cite the right one*?"
+
+- `generate_handbook_evals.py` — reads the ingested `hb-` entities (the handbook,
+  already structured), samples a spread across types, and asks the model to write
+  one natural parent question each entity answers, recording that entity id as
+  `expected_entity`. Questions that trip the sensitive classifier are dropped (a
+  *coverage* set is about answerable facts; restraint is covered elsewhere). Fixed
+  sensitive/out-of-scope distractors are appended so recall can't be gamed by
+  always answering. **Run once, review, commit** — it's a static golden set, not
+  generated at run time.
+  ```
+  api/.venv/Scripts/python.exe evals/generate_handbook_evals.py   # (re)generate
+  ```
+- `handbook_dataset.json` — the committed set. `handbook_evals.py` runs it and
+  scores **Recall@k** (cited the expected entity **or a 1-hop graph neighbor**),
+  **answer rate** (answered vs. over-escalated), grounding, distractor safety, and
+  latency. `handbook_report.md` is the latest run.
+  ```
+  api/.venv/Scripts/python.exe evals/handbook_evals.py
+  ```
+
+Recall reflects the active retrieval mode — expect it higher in `hybrid` than in
+`fts-only`. A recall "miss" is often the agent answering correctly from an equally
+valid source (e.g. center info) rather than the single expected entity.
 
 ## Notes / known limitations
 - The LLM path is **non-deterministic**: borderline answerable questions (e.g.

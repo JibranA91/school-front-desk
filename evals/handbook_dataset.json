@@ -1,0 +1,265 @@
+{
+  "description": "Handbook-grounded coverage/recall eval, generated from the ingested hb- entities (one natural parent question per sampled entity + fixed sensitive/out-of-scope distractors). `expected_entity` is the id the answer should cite; the runner counts a 1-hop graph neighbor as a recall hit too. Regenerate with generate_handbook_evals.py; review before committing.",
+  "per_type": 3,
+  "cases": [
+    {
+      "id": "hb-absence-notification-q",
+      "question": "Do I need to let you know if my child is going to be absent?",
+      "expected": "answer",
+      "expected_entity": "hb-absence-notification",
+      "type": "Attendance"
+    },
+    {
+      "id": "hb-age-groups-served-q",
+      "question": "What age groups do you accept at the daycare?",
+      "expected": "answer",
+      "expected_entity": "hb-age-groups-served",
+      "type": "Program"
+    },
+    {
+      "id": "hb-age-requirements-for-programs-q",
+      "question": "My son turns 4 in October - can he enroll in the Pre-K program this year?",
+      "expected": "answer",
+      "expected_entity": "hb-age-requirements-for-programs",
+      "type": "Enrollment"
+    },
+    {
+      "id": "hb-ages-and-stages-questionnaire-q",
+      "question": "Will I need to fill out any forms about my child's development when we enroll?",
+      "expected": "answer",
+      "expected_entity": "hb-ages-and-stages-questionnaire",
+      "type": "Curriculum"
+    },
+    {
+      "id": "hb-ages-and-stages-screening-schedule-q",
+      "question": "When will my child take the Ages and Stages Questionnaire?",
+      "expected": "answer",
+      "expected_entity": "hb-ages-and-stages-screening-schedule",
+      "type": "Program"
+    },
+    {
+      "id": "hb-aggressive-behavior-and-disenrollment-policy-q",
+      "question": "What happens if my child shows aggressive behavior toward other kids?",
+      "expected": "answer",
+      "expected_entity": "hb-aggressive-behavior-and-disenrollment-policy",
+      "type": "Behavior"
+    },
+    {
+      "id": "hb-arrival-and-departure-requirements-q",
+      "question": "Can my 16-year-old daughter pick up my son from daycare?",
+      "expected": "answer",
+      "expected_entity": "hb-arrival-and-departure-requirements",
+      "type": "Safety"
+    },
+    {
+      "id": "hb-arrival-time-for-extended-care-q",
+      "question": "What time do I need to drop off my child for Extended Care?",
+      "expected": "answer",
+      "expected_entity": "hb-arrival-time-for-extended-care",
+      "type": "Attendance"
+    },
+    {
+      "id": "hb-birthday-celebrations-q",
+      "question": "Can I bring cupcakes for my daughter's birthday to share with her class?",
+      "expected": "answer",
+      "expected_entity": "hb-birthday-celebrations",
+      "type": "Policy"
+    },
+    {
+      "id": "hb-center-closure-for-non-compliance-q",
+      "question": "What happens if the daycare loses power or water during the day?",
+      "expected": "answer",
+      "expected_entity": "hb-center-closure-for-non-compliance",
+      "type": "Safety"
+    },
+    {
+      "id": "hb-center-lock-down-procedure-q",
+      "question": "What should I do if the center is in lockdown when I arrive to pick up my child?",
+      "expected": "answer",
+      "expected_entity": "hb-center-lock-down-procedure",
+      "type": "Safety"
+    },
+    {
+      "id": "hb-center-orientation-q",
+      "question": "What happens on my child's first day at the center?",
+      "expected": "answer",
+      "expected_entity": "hb-center-orientation",
+      "type": "Enrollment"
+    },
+    {
+      "id": "hb-child-abuse-and-neglect-reporting-q",
+      "question": "Are your teachers trained to recognize and report signs of child abuse?",
+      "expected": "answer",
+      "expected_entity": "hb-child-abuse-and-neglect-reporting",
+      "type": "Policy"
+    },
+    {
+      "id": "hb-child-assessments-and-screenings-q",
+      "question": "How will I find out about my child's progress and development at daycare?",
+      "expected": "answer",
+      "expected_entity": "hb-child-assessments-and-screenings",
+      "type": "Curriculum"
+    },
+    {
+      "id": "hb-closure-dates-q",
+      "question": "Where can I get a list of the days the daycare will be closed?",
+      "expected": "answer",
+      "expected_entity": "hb-closure-dates",
+      "type": "Holiday"
+    },
+    {
+      "id": "hb-creative-curriculum-assessment-teaching-strategies-q",
+      "question": "How do you track and share my child's progress with me?",
+      "expected": "answer",
+      "expected_entity": "hb-creative-curriculum-assessment-teaching-strategies",
+      "type": "Curriculum"
+    },
+    {
+      "id": "hb-disenrollment-for-behavioral-issues-q",
+      "question": "Can my child be kicked out of the program for behavior problems?",
+      "expected": "answer",
+      "expected_entity": "hb-disenrollment-for-behavioral-issues",
+      "type": "Enrollment"
+    },
+    {
+      "id": "hb-dress-for-messy-play-q",
+      "question": "What kind of clothes should I dress my child in for daycare?",
+      "expected": "answer",
+      "expected_entity": "hb-dress-for-messy-play",
+      "type": "Supplies"
+    },
+    {
+      "id": "hb-early-head-start-daily-sheets-q",
+      "question": "Do I need to fill out the daily sheet every morning before I drop off my child?",
+      "expected": "answer",
+      "expected_entity": "hb-early-head-start-daily-sheets",
+      "type": "Communication"
+    },
+    {
+      "id": "hb-early-head-start-diaper-policy-q",
+      "question": "Do I need to bring diapers or does the daycare provide them?",
+      "expected": "answer",
+      "expected_entity": "hb-early-head-start-diaper-policy",
+      "type": "Supplies"
+    },
+    {
+      "id": "hb-early-head-start-home-visits-q",
+      "question": "How often will my child's teacher do home visits?",
+      "expected": "answer",
+      "expected_entity": "hb-early-head-start-home-visits",
+      "type": "Communication"
+    },
+    {
+      "id": "hb-early-head-start-hours-and-schedule-q",
+      "question": "What time does Early Head Start end each day?",
+      "expected": "answer",
+      "expected_entity": "hb-early-head-start-hours-and-schedule",
+      "type": "Hours"
+    },
+    {
+      "id": "hb-early-head-start-parent-engagement-opportunities-q",
+      "question": "What are the different ways I can get involved at the Early Head Start Center?",
+      "expected": "answer",
+      "expected_entity": "hb-early-head-start-parent-engagement-opportunities",
+      "type": "Communication"
+    },
+    {
+      "id": "hb-early-head-start-program-hours-ages-0-3-q",
+      "question": "What are the hours for the Early Head Start program for my 2 year old?",
+      "expected": "answer",
+      "expected_entity": "hb-early-head-start-program-hours-ages-0-3",
+      "type": "Hours"
+    },
+    {
+      "id": "hb-early-head-start-room-transitions-q",
+      "question": "What happens when my child gets too old for their current room?",
+      "expected": "answer",
+      "expected_entity": "hb-early-head-start-room-transitions",
+      "type": "Program"
+    },
+    {
+      "id": "hb-early-head-start-vacation-policy-q",
+      "question": "Will my child lose their spot if we take a 2 week vacation?",
+      "expected": "answer",
+      "expected_entity": "hb-early-head-start-vacation-policy",
+      "type": "Attendance"
+    },
+    {
+      "id": "hb-extra-clothes-requirement-q",
+      "question": "What happens if my child doesn't have extra clothes at daycare when they need them?",
+      "expected": "answer",
+      "expected_entity": "hb-extra-clothes-requirement",
+      "type": "Supplies"
+    },
+    {
+      "id": "hb-family-style-meals-q",
+      "question": "How are meals served at the daycare?",
+      "expected": "answer",
+      "expected_entity": "hb-family-style-meals",
+      "type": "Meal"
+    },
+    {
+      "id": "hb-guidance-and-discipline-philosophy-q",
+      "question": "How do you handle discipline when my child misbehaves?",
+      "expected": "answer",
+      "expected_entity": "hb-guidance-and-discipline-philosophy",
+      "type": "Behavior"
+    },
+    {
+      "id": "hb-holiday-and-cultural-celebrations-q",
+      "question": "Do you celebrate holidays at the daycare or accommodate our family's traditions?",
+      "expected": "answer",
+      "expected_entity": "hb-holiday-and-cultural-celebrations",
+      "type": "Holiday"
+    },
+    {
+      "id": "hb-infant-formula-and-breast-milk-q",
+      "question": "Do I need to bring formula for my baby or do you provide it?",
+      "expected": "answer",
+      "expected_entity": "hb-infant-formula-and-breast-milk",
+      "type": "Meal"
+    },
+    {
+      "id": "hb-nm-pre-k-daily-schedule-hours-q",
+      "question": "What time does Pre-K start and end?",
+      "expected": "answer",
+      "expected_entity": "hb-nm-pre-k-daily-schedule-hours",
+      "type": "Hours"
+    },
+    {
+      "id": "hb-snow-days-and-weather-closures-q",
+      "question": "What happens if there's a snow day or bad weather?",
+      "expected": "answer",
+      "expected_entity": "hb-snow-days-and-weather-closures",
+      "type": "Holiday"
+    },
+    {
+      "id": "dis-fever",
+      "question": "My child has a fever of 101 — can she still come in today?",
+      "expected": "escalate_sensitive",
+      "category": "health"
+    },
+    {
+      "id": "dis-meds",
+      "question": "Can a teacher give my son his antibiotics at lunch?",
+      "expected": "escalate_sensitive",
+      "category": "medication"
+    },
+    {
+      "id": "dis-allergy",
+      "question": "My daughter has a severe peanut allergy — how do you handle that?",
+      "expected": "escalate_sensitive",
+      "category": "allergy"
+    },
+    {
+      "id": "dis-weather",
+      "question": "What's the weather going to be like tomorrow?",
+      "expected": "decline_oos"
+    },
+    {
+      "id": "dis-sports",
+      "question": "Who won the basketball game last night?",
+      "expected": "decline_oos"
+    }
+  ]
+}
