@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import OperatorView from "@/components/OperatorView";
 import SessionBar from "@/components/SessionBar";
+import ViewportSync from "@/components/ViewportSync";
 
 export default async function OperatorPage() {
   const session = await auth();
@@ -17,6 +18,7 @@ export default async function OperatorPage() {
         position: "relative",
       }}
     >
+      <ViewportSync />
       <SessionBar name={user?.name ?? ""} />
       <OperatorView
         operatorName={user?.name ?? "Maria Chen"}

@@ -106,11 +106,22 @@ button:focus-visible {
    at the breakpoint — same pattern as the hover states below.
 --------------------------------------------------------------------------- */
 @media (max-width: 720px) {
-  /* Full-screen app: no page chrome around the views. */
+  /* Full-screen app: no page chrome, pinned to the *visual* viewport so the
+     keyboard shrinks the app instead of scrolling the header off-screen.
+     --vvh is set from window.visualViewport by <ViewportSync>. */
   .fd-page {
     padding: 0 !important;
-    min-height: 100dvh !important;
+    height: 100dvh !important;
+    height: var(--vvh, 100dvh) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
     background: #ffffff !important;
+  }
+  /* iOS zooms into any input with font-size < 16px on focus, which visually
+     breaks the layout when the keyboard opens. Force >=16px on phones. */
+  input,
+  textarea {
+    font-size: 16px !important;
   }
   /* Sign-out floats over the app header as a compact pill (name hidden), so it
      doesn't reserve a top gap. */
@@ -136,6 +147,7 @@ button:focus-visible {
     max-width: none !important;
     height: 100vh !important;
     height: 100dvh !important;
+    height: var(--vvh, 100dvh) !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -147,6 +159,7 @@ button:focus-visible {
     width: 100% !important;
     height: 100vh !important;
     height: 100dvh !important;
+    height: var(--vvh, 100dvh) !important;
     min-height: 0 !important;
     border: none !important;
     border-radius: 0 !important;

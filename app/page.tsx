@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import ParentView from "@/components/ParentView";
 import SessionBar from "@/components/SessionBar";
+import ViewportSync from "@/components/ViewportSync";
 
 export default async function Home() {
   const session = await auth();
@@ -17,6 +18,7 @@ export default async function Home() {
         position: "relative",
       }}
     >
+      <ViewportSync />
       <SessionBar name={user?.name ?? ""} />
       <ParentView />
     </div>
