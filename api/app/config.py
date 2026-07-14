@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # mock embedder), or to run leaner with no embedding provider at all.
     embeddings_enabled: bool = True
 
+    # Short-term chat memory: how many prior turns of the current session to feed
+    # the parent agent so it can resolve follow-ups ("what about fever?"). 0 = off
+    # (stateless single-turn). A turn = one user + one assistant message.
+    chat_memory_turns: int = 10
+
     # The relevant subgraph is always pre-retrieved and injected into the parent
     # agent's context. When True, the agent ALSO gets knowledge-graph tools
     # (search_graph/get_entity/expand_neighbors) to look further; when False it

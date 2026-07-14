@@ -215,7 +215,9 @@ def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
     conversation thread, logs the inquiry for the operator inbox, and returns a
     renderable answer."""
     asker = _as_uuid(body.asker_id)
-    result = agent.answer_question(db, body.question, asker_id=asker)
+    result = agent.answer_question(
+        db, body.question, asker_id=asker, session_id=body.session_id
+    )
 
     # Persist the transcript (the human 1:1 channel — never read by the agent).
     if asker is not None:

@@ -194,7 +194,51 @@ def _format_subgraph(entities: list[dict]) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = None) -> dict:
+def _recent_turns(
+    db: Session, asker_id: uuid.UUID | None, session_id: str | None, turns: int
+) -> list[dict]:
+    """The last `turns` user/assistant exchanges of the CURRENT session, as chat
+    messages for the agent — short-term memory so it can resolve follow-ups.
+    Scoped to the session id and excludes staff replies (those aren't part of the
+    AI dialogue). Empty when memory is off or there's no session yet."""
+    if asker_id is None or not session_id or turns <= 0:
+        return []
+    conv = db.scalar(
+        select(models.Conversation)
+        .where(models.Conversation.parent_id == asker_id)
+        .order_by(models.Conversation.created_at)
+        .limit(1)
+    )
+    if conv is None:
+        return []
+    rows = db.scalars(
+        select(models.Message)
+        .where(models.Message.conversation_id == conv.id)
+        .where(models.Message.session_id == session_id)
+        .where(models.Message.kind != "staff")
+        .order_by(models.Message.created_at.desc())
+        .limit(turns * 2)  # a turn = user + assistant
+    ).all()
+    history: list[dict] = []
+    for m in reversed(rows):  # back to chronological order
+        c = m.content or {}
+        if m.kind == "user":
+            text = c.get("text") or ""
+            if text:
+                history.append({"role": "user", "content": text})
+        else:
+            text = c.get("answer") or c.get("text") or ""
+            if text:
+                history.append({"role": "assistant", "content": text})
+    return history
+
+
+def _bedrock_answer(
+    db: Session,
+    question: str,
+    asker_id: uuid.UUID | None = None,
+    session_id: str | None = None,
+) -> dict:
     from langchain_core.tools import tool
     from langgraph.prebuilt import create_react_agent
     from pydantic import BaseModel, Field
@@ -358,7 +402,13 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
         prompt=system,
         response_format=Answer,
     )
-    result = agent.invoke({"messages": [{"role": "user", "content": question}]})
+    # Short-term memory: prepend the current session's recent turns so the agent
+    # can resolve follow-ups ("what about fever?"). Retrieval + the sensitive
+    # safety net still key off the current question text.
+    history = _recent_turns(db, asker_id, session_id, settings.chat_memory_turns)
+    result = agent.invoke(
+        {"messages": [*history, {"role": "user", "content": question}]}
+    )
     s: Answer = result["structured_response"]
     # A citation is valid if it's a real entity or a known live-data ref.
     valid = [c for c in s.citations if c in LIVE_SOURCES or kb.get_entity(c)]
@@ -373,14 +423,19 @@ def _bedrock_answer(db: Session, question: str, asker_id: uuid.UUID | None = Non
     }
 
 
-def _answer_bedrock(db: Session, question: str, asker_id: uuid.UUID | None = None) -> dict:
+def _answer_bedrock(
+    db: Session,
+    question: str,
+    asker_id: uuid.UUID | None = None,
+    session_id: str | None = None,
+) -> dict:
     # Safety net first, deterministically — sensitive topics always escalate,
     # without depending on (or paying for) the model.
     sensitive = escalation.classify_sensitive(question)
     if sensitive is not None:
         return _sensitive_response(question, sensitive)
 
-    raw = _bedrock_answer(db, question, asker_id)
+    raw = _bedrock_answer(db, question, asker_id, session_id)
     if raw["intent"] == "greeting":
         return _greeting_response(question, raw["answer"] or "Hi! How can I help you today?")
     if raw["intent"] == "out_of_scope":
@@ -494,14 +549,18 @@ def _answer_mock(db: Session, question: str) -> dict:
 
 
 def answer_question(
-    db: Session, question: str, asker_id: uuid.UUID | None = None
+    db: Session,
+    question: str,
+    asker_id: uuid.UUID | None = None,
+    session_id: str | None = None,
 ) -> dict:
     """Full pipeline. Returns a shape the frontend can render directly.
 
     `asker_id` is the authenticated parent (server-derived, never client-trusted);
-    it scopes the personalized live-data tool to that family. The mock path has no
-    tool-calling, so it ignores it.
+    it scopes the personalized live-data tool to that family. `session_id` scopes
+    short-term memory to the current chat session. The mock path has no
+    tool-calling or memory, so it ignores both.
     """
     if settings.llm_enabled:
-        return _answer_bedrock(db, question, asker_id)
+        return _answer_bedrock(db, question, asker_id, session_id)
     return _answer_mock(db, question)
