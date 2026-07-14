@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 export default function SessionBar({ name }: { name: string }) {
   return (
     <div
+      className="fd-sessionbar"
       style={{
         position: "fixed",
         top: 16,

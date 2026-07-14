@@ -570,7 +570,7 @@ export default function InboxPanel({
   const conflict = proposal?.changes.find((c) => c.is_conflict) ?? null;
 
   return (
-    <div style={{ padding: "30px 34px" }}>
+    <div className="fd-pad" style={{ padding: "30px 34px" }}>
       {!selected ? (
         <>
           <div

@@ -8,6 +8,7 @@ export default async function Home() {
 
   return (
     <div
+      className="fd-page"
       style={{
         minHeight: "100vh",
         background: "#F7F9FB",

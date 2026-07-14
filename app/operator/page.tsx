@@ -8,6 +8,7 @@ export default async function OperatorPage() {
 
   return (
     <div
+      className="fd-page"
       style={{
         minHeight: "100vh",
         background: "#F7F9FB",

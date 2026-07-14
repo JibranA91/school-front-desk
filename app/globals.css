@@ -100,6 +100,70 @@ button:focus-visible {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Responsive overrides for phones/tablets. The components are inline-styled
+   (desktop-first), so these use !important to win over the inline base styles
+   at the breakpoint — same pattern as the hover states below.
+--------------------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .fd-page {
+    padding: 56px 10px 12px !important;
+  }
+  .fd-sessionbar {
+    top: 10px !important;
+    right: 10px !important;
+  }
+
+  /* Parent chat fills the screen instead of a fixed phone-mockup card. */
+  .fd-parent-card {
+    width: 100% !important;
+    height: calc(100vh - 66px) !important;
+    height: calc(100dvh - 66px) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 8px 24px -16px rgba(30, 37, 73, 0.25) !important;
+  }
+
+  /* Operator: the dark side rail becomes a compact top tab bar. */
+  .fd-op-shell {
+    flex-direction: column !important;
+    width: 100% !important;
+    height: calc(100vh - 66px) !important;
+    height: calc(100dvh - 66px) !important;
+    min-height: 0 !important;
+    border-radius: 16px !important;
+  }
+  .fd-op-sidebar {
+    width: 100% !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 8px !important;
+  }
+  .fd-op-logo,
+  .fd-op-profile {
+    display: none !important;
+  }
+  .fd-op-nav {
+    flex-direction: row !important;
+    width: 100% !important;
+    gap: 6px !important;
+  }
+  .fd-op-nav > button {
+    flex: 1 1 0 !important;
+    justify-content: center !important;
+    padding: 9px 6px !important;
+    font-size: 12.5px !important;
+    white-space: nowrap !important;
+  }
+  .fd-op-nav > button > span {
+    flex: 0 1 auto !important;
+  }
+
+  /* Trim the desktop 30px/34px section padding on phones. */
+  .fd-pad {
+    padding: 18px 14px !important;
+  }
+}
+
 /* Hover states — !important so they win over the ported inline base styles */
 .fd-chip:hover {
   background: #eef1ff !important;

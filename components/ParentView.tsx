@@ -98,6 +98,7 @@ export default function ParentView() {
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
       <div
+        className="fd-parent-card"
         style={{
           width: 390,
           maxWidth: "100%",

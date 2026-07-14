@@ -192,6 +192,7 @@ export default function OperatorView({
 
   return (
     <div
+      className="fd-op-shell"
       style={{
         width: "min(1180px,96vw)",
         margin: "0 auto",
@@ -208,6 +209,7 @@ export default function OperatorView({
     >
       {/* Sidebar */}
       <div
+        className="fd-op-sidebar"
         style={{
           width: 248,
           flexShrink: 0,
@@ -218,6 +220,7 @@ export default function OperatorView({
         }}
       >
         <div
+          className="fd-op-logo"
           style={{
             display: "flex",
             alignItems: "center",
@@ -274,7 +277,7 @@ export default function OperatorView({
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div className="fd-op-nav" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <button
             className="fd-nav"
             onClick={() => {
@@ -356,6 +359,7 @@ export default function OperatorView({
         </div>
 
         <div
+          className="fd-op-profile"
           style={{
             marginTop: "auto",
             display: "flex",
@@ -418,7 +422,7 @@ export default function OperatorView({
         )}
 
         {nav === "knowledge" && (
-          <div style={{ padding: "30px 34px", maxWidth: 760 }}>
+          <div className="fd-pad" style={{ padding: "30px 34px", maxWidth: 760 }}>
             <div
               style={{
                 fontSize: 24,
@@ -1017,7 +1021,7 @@ export default function OperatorView({
         )}
 
         {nav === "changelog" && (
-          <div style={{ padding: "30px 34px", maxWidth: 720 }}>
+          <div className="fd-pad" style={{ padding: "30px 34px", maxWidth: 720 }}>
             <div
               style={{
                 fontSize: 24,
