@@ -1,7 +1,9 @@
-"""Embedding provider: Bedrock Titan when AWS creds are present, otherwise a
-deterministic hashed bag-of-words mock so the whole retrieval pipeline runs
-(and is testable) offline. Mock vectors put shared words in shared dimensions,
-so cosine similarity still tracks word overlap — good enough to exercise ranking.
+"""Embedding provider, chosen by settings.embedder: Voyage AI (recommended for
+the Claude/Anthropic path, which has no first-party embeddings API), Bedrock
+Titan, or a deterministic hashed bag-of-words mock so the whole retrieval
+pipeline runs (and is testable) offline. Mock vectors put shared words in shared
+dimensions, so cosine similarity still tracks word overlap — good enough to
+exercise ranking. All three emit settings.embedding_dims-length vectors.
 """
 
 from __future__ import annotations
@@ -51,13 +53,38 @@ def _bedrock():
     return BedrockEmbeddings(client=client, model_id=settings.bedrock_embedding_model)
 
 
+@lru_cache(maxsize=1)
+def _voyage():
+    import voyageai
+
+    return voyageai.Client(api_key=settings.voyage_api_key)
+
+
+def _voyage_embed(texts: list[str], input_type: str) -> list[list[float]]:
+    # input_type ("document" vs "query") lets Voyage tune each side of the
+    # retrieval pair; output_dimension pins the vector to our pgvector column.
+    res = _voyage().embed(
+        list(texts),
+        model=settings.voyage_embedding_model,
+        input_type=input_type,
+        output_dimension=settings.embedding_dims,
+    )
+    return res.embeddings
+
+
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    if settings.bedrock_enabled:
+    embedder = settings.embedder
+    if embedder == "voyage":
+        return _voyage_embed(list(texts), "document")
+    if embedder == "titan":
         return _bedrock().embed_documents(list(texts))
     return [_mock_embed(t) for t in texts]
 
 
 def embed_query(text: str) -> list[float]:
-    if settings.bedrock_enabled:
+    embedder = settings.embedder
+    if embedder == "voyage":
+        return _voyage_embed([text], "query")[0]
+    if embedder == "titan":
         return _bedrock().embed_query(text)
     return _mock_embed(text)

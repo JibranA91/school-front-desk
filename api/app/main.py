@@ -75,11 +75,7 @@ def health() -> dict:
         "provider": settings.provider,  # bedrock | anthropic | mock
         "llm_enabled": settings.llm_enabled,
         "retrieval": "hybrid" if settings.embeddings_enabled else "fts-only",
-        "embeddings": (
-            ("titan" if settings.bedrock_enabled else "mock")
-            if settings.embeddings_enabled
-            else "off"
-        ),
+        "embeddings": settings.embedder if settings.embeddings_enabled else "off",
     }
 
 

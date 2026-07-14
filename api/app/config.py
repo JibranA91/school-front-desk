@@ -57,6 +57,18 @@ class Settings(BaseSettings):
     anthropic_chat_model: str = "claude-sonnet-4-5"
     embedding_dims: int = 1024
 
+    # Which embedder to use: "voyage" | "titan" | "mock" | "auto" (default).
+    # auto = Voyage if VOYAGE_API_KEY is set, else Titan in bedrock mode, else the
+    # offline mock. Voyage is independent of the CHAT provider, so it gives the
+    # Anthropic/Claude path (which has no first-party embeddings API) real
+    # semantic vectors instead of the mock.
+    embeddings_provider: str = "auto"
+    # Voyage AI (the `voyageai` package). Its models default to 1024 dims, which
+    # matches embedding_dims and the pgvector column — so switching is a
+    # dimension drop-in (no schema change). voyage-4* carry a 200M-token free tier.
+    voyage_api_key: str | None = None
+    voyage_embedding_model: str = "voyage-3.5"
+
     # CORS — the web origin allowed to call this API.
     web_origin: str = "http://localhost:3000"
 
@@ -125,10 +137,24 @@ class Settings(BaseSettings):
 
     @property
     def bedrock_enabled(self) -> bool:
-        """Whether embeddings are served by Bedrock Titan. Only in bedrock mode —
-        the anthropic and mock paths use the offline mock embedder (Anthropic has
-        no embeddings API)."""
+        """Whether the resolved CHAT provider is Bedrock. (Embeddings are chosen
+        separately — see `embedder`.)"""
         return self.provider == "bedrock"
+
+    @property
+    def embedder(self) -> str:
+        """Resolved embedding backend: 'voyage', 'titan', or 'mock'.
+        auto = Voyage if a key is set, else Titan when chatting on Bedrock, else
+        the offline mock. Voyage decouples embeddings from the chat provider, so
+        the Anthropic path can have real vectors."""
+        e = (self.embeddings_provider or "auto").lower()
+        if e in ("voyage", "titan", "mock"):
+            return e
+        if self.voyage_api_key:
+            return "voyage"
+        if self.provider == "bedrock":
+            return "titan"
+        return "mock"
 
 
 settings = Settings()

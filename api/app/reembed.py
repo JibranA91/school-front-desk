@@ -1,8 +1,8 @@
 """Recompute and store embeddings for every knowledge-base entity using the
-currently-configured embedder (Bedrock Titan in bedrock mode, otherwise the
-offline mock). Run this after switching LLM provider / embedder so the stored
-document vectors match the query vectors — mixing embedders in one vector space
-makes semantic search meaningless.
+currently-configured embedder (settings.embedder: Voyage, Bedrock Titan, or the
+offline mock). Run this after switching embedder/provider so the stored document
+vectors match the query vectors — mixing embedders in one vector space makes
+semantic search meaningless.
 
     uv run python -m app.reembed          # inside the api container
     ../.venv/Scripts/python -m app.reembed  # from ./api on the host
@@ -36,7 +36,11 @@ def reembed(batch_size: int = 64) -> int:
 
 
 if __name__ == "__main__":
-    embedder = "Bedrock Titan" if settings.bedrock_enabled else "mock (offline)"
+    embedder = {
+        "voyage": f"Voyage ({settings.voyage_embedding_model})",
+        "titan": "Bedrock Titan",
+        "mock": "mock (offline)",
+    }.get(settings.embedder, settings.embedder)
     if not settings.embeddings_enabled:
         print(
             "Note: EMBEDDINGS_ENABLED=false — retrieval is FTS-only and ignores "
@@ -44,3 +48,7 @@ if __name__ == "__main__":
         )
     n = reembed()
     print(f"Re-embedded {n} entities using the {embedder} embedder.")
+    print(
+        "Next: run `python -m app.relink` to rebuild the graph's similarity "
+        "edges in this embedding space (they don't update automatically)."
+    )
