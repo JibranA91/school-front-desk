@@ -16,6 +16,7 @@ import uuid
 from pydantic import BaseModel
 
 from app.config import settings
+from app.model_catalog import resolve_chat_model
 from app.db import SessionLocal, get_db, init_db
 from app import agent, authoring, ingest, models, retrieval
 from app.routers import auth as auth_router
@@ -76,6 +77,10 @@ def health() -> dict:
         "llm_enabled": settings.llm_enabled,
         "retrieval": "hybrid" if settings.embeddings_enabled else "fts-only",
         "embeddings": settings.embedder if settings.embeddings_enabled else "off",
+        "models": {
+            "parent": resolve_chat_model(settings.parent_model, settings.provider),
+            "chat": resolve_chat_model(settings.chat_model, settings.provider),
+        } if settings.llm_enabled else "mock",
     }
 
 

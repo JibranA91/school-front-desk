@@ -1,24 +1,16 @@
 """Chat-model factory. Returns a LangChain chat model for the configured provider
 — Claude via Bedrock (langchain-aws) or the Claude API (langchain-anthropic) —
 behind one interface so the agent, structured output, and tool-calling code are
-provider-agnostic. Lazy + cached per (provider, model, budget, temp)."""
+provider-agnostic. Call sites pass a LOGICAL model id (see app.model_catalog),
+resolved here to the provider's concrete string. Lazy + cached per (provider,
+model, budget, temp)."""
 
 from __future__ import annotations
 
 from app.config import settings
+from app.model_catalog import resolve_chat_model
 
 _cache: dict[str, object] = {}
-
-
-def _anthropic_model(model_id: str | None) -> str:
-    """Map a Bedrock inference-profile id (what call sites pass) to the equivalent
-    Anthropic-API model id, so callers don't need to know the active provider."""
-    if model_id is None:
-        return settings.anthropic_chat_model
-    return {
-        settings.bedrock_parent_model: settings.anthropic_parent_model,
-        settings.bedrock_chat_model: settings.anthropic_chat_model,
-    }.get(model_id, model_id)
 
 
 def get_chat_model(
@@ -27,10 +19,10 @@ def get_chat_model(
     temperature: float | None = None,
 ):
     provider = settings.provider
-    if provider == "anthropic":
-        mid = _anthropic_model(model_id)
-    else:
-        mid = model_id or settings.bedrock_chat_model
+    # `model_id` is a LOGICAL id (e.g. "sonnet-4.5"); the catalog maps it to the
+    # provider's concrete model string (default + log for an unknown id). When
+    # omitted, fall back to the configured chat model.
+    mid = resolve_chat_model(model_id or settings.chat_model, provider)
     key = f"{provider}#{mid}#{max_tokens}#{temperature}"
     if key not in _cache:
         if provider == "anthropic":

@@ -66,7 +66,7 @@ def _question_for(entity_id: str, name: str, type_: str, body: str):
         parent_relevant: bool = Field(description="True if a parent would plausibly text the front desk about this; false if it's internal/administrative.")
         question: str = Field(description="One short, natural question a parent would ask that THIS fact directly answers. Empty if not parent_relevant.")
 
-    model = get_chat_model(settings.bedrock_chat_model, max_tokens=512).with_structured_output(QGen)
+    model = get_chat_model(settings.chat_model, max_tokens=512).with_structured_output(QGen)
     prompt = (
         "You are writing eval questions for a daycare's AI front desk. Given ONE "
         "handbook fact, write a single natural question a parent would text that this "
@@ -89,7 +89,7 @@ def main() -> None:
 
     # Warm the shared model, then generate questions concurrently.
     from app.llm import get_chat_model
-    get_chat_model(settings.bedrock_chat_model, max_tokens=512)
+    get_chat_model(settings.chat_model, max_tokens=512)
 
     cases: list[dict] = []
     skipped = 0

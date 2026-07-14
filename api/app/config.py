@@ -47,14 +47,17 @@ class Settings(BaseSettings):
     # Anthropic Claude API (used when provider == "anthropic").
     anthropic_api_key: str | None = None
 
-    # Model ids (Bedrock inference profiles; env-overridable to enabled models).
-    # Parent chat → Haiku (fast, cheap). Operator agents (author/cleanup) → Sonnet.
-    bedrock_parent_model: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-    bedrock_chat_model: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    # Chat models as LOGICAL ids, resolved per provider by app.model_catalog
+    # (e.g. "sonnet-4.5", "haiku-4.5"; matching is case/punctuation-insensitive).
+    # Set LLM_PROVIDER + these two — the catalog maps each to the provider's
+    # concrete model string, falling back to the provider default (logged) for an
+    # unknown id. parent_model = the parent chat agent (fast); chat_model =
+    # operator authoring / handbook extraction (stronger).
+    parent_model: str = "haiku-4.5"
+    chat_model: str = "sonnet-4.5"
+    # Embeddings are a separate axis (see `embedder` / embeddings.py). This is the
+    # Titan model id used only on the Titan/bedrock embedding path.
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
-    # Anthropic-API model ids (plain, no inference-profile prefix/suffix).
-    anthropic_parent_model: str = "claude-haiku-4-5"
-    anthropic_chat_model: str = "claude-sonnet-4-5"
     embedding_dims: int = 1024
 
     # Which embedder to use: "voyage" | "titan" | "mock" | "auto" (default).

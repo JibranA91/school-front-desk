@@ -462,7 +462,7 @@ def _bedrock_answer(
     agent = create_react_agent(
         # temperature=0: this is factual grounding, not creative writing — keeps
         # borderline answer/hand-off decisions stable across runs.
-        get_chat_model(settings.bedrock_parent_model, temperature=0),
+        get_chat_model(settings.parent_model, temperature=0),
         tools=tools,
         prompt=system,
         response_format=Answer,

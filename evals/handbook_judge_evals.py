@@ -58,7 +58,7 @@ def _judge_model():
         grounded: bool = Field(description="False if the answer states specifics not supported by the reference (hallucination).")
         reason: str = Field(description="One short sentence.")
 
-    return get_chat_model(settings.bedrock_chat_model, temperature=0).with_structured_output(Verdict), Verdict
+    return get_chat_model(settings.chat_model, temperature=0).with_structured_output(Verdict), Verdict
 
 
 def main() -> None:
@@ -134,7 +134,7 @@ def write_report(rows: list[dict]) -> None:
     L = [
         "# Handbook answer-correctness (LLM-judge) — eval report", "",
         f"- Run: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
-        f"- Retrieval: **{mode}** (embedder: {embedder}) · judge: {settings.bedrock_chat_model}",
+        f"- Retrieval: **{mode}** (embedder: {embedder}) · judge: {settings.chat_model}",
         f"- Answerable: {len(ans)} · distractors: {len(dis)}", "",
         "## Headline", "",
         f"- **Correct: {len(correct)}/{len(ans)} ({pct(len(correct), len(ans))})**",

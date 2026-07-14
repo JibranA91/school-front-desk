@@ -89,7 +89,7 @@ def propose(db: Session, instruction: str) -> dict:
         "- new_value is always a string. Be precise; do not invent unrelated changes.\n\n"
         f"CURRENT ENTITIES:\n{_serialize_graph(db)}"
     )
-    model = get_chat_model(settings.bedrock_chat_model).with_structured_output(Proposal)
+    model = get_chat_model(settings.chat_model).with_structured_output(Proposal)
     proposal = model.invoke([("system", system), ("human", instruction)])
 
     # Backstop against the model spawning a contradictory near-duplicate: if it

@@ -165,7 +165,7 @@ def _extract_llm(chunk: Chunk) -> list[Extracted]:
 
     # Dense policy pages produce many entities; 1024 tokens truncates the tool
     # call and yields an empty result, so give extraction a larger budget.
-    model = get_chat_model(settings.bedrock_chat_model, max_tokens=4096).with_structured_output(
+    model = get_chat_model(settings.chat_model, max_tokens=4096).with_structured_output(
         Extraction
     )
     human = f"Handbook excerpt (pages {chunk.page_start}-{chunk.page_end}):\n\n{chunk.text}"
@@ -408,7 +408,7 @@ def ingest_pdf(
         # the cache instead of racing to build a client on first use.
         from app.llm import get_chat_model
 
-        get_chat_model(settings.bedrock_chat_model, max_tokens=4096)
+        get_chat_model(settings.chat_model, max_tokens=4096)
 
     # Sections are independent (dedup + linking happen afterward), so extract
     # them concurrently — a handful of workers turns N sequential model calls
