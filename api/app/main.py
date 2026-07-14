@@ -350,6 +350,23 @@ def my_updates_seen(parent_id: str, db: Session = Depends(get_db)) -> dict:
     return {"ok": True}
 
 
+class ThemeRequest(BaseModel):
+    theme: str  # 'light' | 'dark'
+
+
+@app.post("/me/theme")
+def set_theme(body: ThemeRequest, user_id: str, db: Session = Depends(get_db)) -> dict:
+    """Persist the signed-in user's color-scheme preference. Applies to any user
+    (parent or operator); user_id comes from the trusted session, never the client."""
+    theme = body.theme if body.theme in ("light", "dark") else "light"
+    user = db.get(models.User, _as_uuid(user_id))
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user.theme = theme
+    db.commit()
+    return {"ok": True, "theme": theme}
+
+
 class AuthorProposeRequest(BaseModel):
     instruction: str
 

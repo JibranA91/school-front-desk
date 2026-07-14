@@ -1,5 +1,165 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Theme tokens. LIGHT values equal the colors the app shipped with, so light
+   mode is byte-identical to before; the [data-theme="dark"] block is the only
+   thing that changes anything. <html data-theme> is set by the server (from the
+   user's saved preference) and flipped live by the sign-out-bar toggle.
+   Generated + kept in sync via scratchpad/tokenize.mjs.
+--------------------------------------------------------------------------- */
+:root {
+  --fd-surface: #FFFFFF;
+  --fd-on-accent: #FFFFFF;
+  --fd-bg: #F7F9FB;
+  --fd-surface-2: #FBFCFE;
+  --fd-sunken: #F0F2F7;
+  --fd-sunken-2: #F0F3F8;
+  --fd-sunken-3: #F3F4F8;
+  --fd-border: #EBEFF4;
+  --fd-border-2: #D9DFEA;
+  --fd-border-3: #E4E8F1;
+  --fd-text: #18181D;
+  --fd-text-2: #3E4252;
+  --fd-muted: #5C5E6A;
+  --fd-faint: #737685;
+  --fd-dim: #9497A6;
+  --fd-dim-2: #9AA0B4;
+  --fd-dim-3: #A2A6B4;
+  --fd-dim-4: #C4C8D4;
+  --fd-brand: #5463D6;
+  --fd-brand-hover: #6476FF;
+  --fd-accent-text: #4B57B8;
+  --fd-accent-text-2: #37458A;
+  --fd-accent-strong: #2D355F;
+  --fd-avatar-bg: #1E2549;
+  --fd-accent-bg: #EEF1FF;
+  --fd-accent-bg-2: #E3E8FF;
+  --fd-accent-bg-3: #F1F4FF;
+  --fd-accent-bg-4: #F5F7FF;
+  --fd-accent-border: #DCE1FF;
+  --fd-accent-border-2: #DDE7FF;
+  --fd-accent-strong-bg: #C9CFFF;
+  --fd-focus: #B1BAFF;
+  --fd-accent-dim: #9AA3E6;
+  --fd-accent-dim-2: #8B93C9;
+  --fd-accent-dim-3: #AEB4D6;
+  --fd-accent-dim-4: #8188B8;
+  --fd-green: #3BBA6E;
+  --fd-green-text: #227A47;
+  --fd-green-text-2: #1A6B3D;
+  --fd-green-text-3: #3E8259;
+  --fd-green-bg: #E7F7EE;
+  --fd-green-border: #BFE9CF;
+  --fd-amber: #FF9D17;
+  --fd-amber-2: #E08A0B;
+  --fd-amber-text: #B5710A;
+  --fd-amber-text-2: #C77B0E;
+  --fd-amber-text-3: #9A5A00;
+  --fd-amber-text-4: #8A5A00;
+  --fd-yellow-text: #8A6D12;
+  --fd-yellow-text-2: #9A7B12;
+  --fd-on-amber: #3A2200;
+  --fd-amber-bg: #FFF1DE;
+  --fd-amber-bg-2: #FFF7ED;
+  --fd-amber-bg-3: #FFF6EB;
+  --fd-amber-border: #FFE1BB;
+  --fd-amber-border-2: #F6D9A6;
+  --fd-amber-bg-4: #FFF9EF;
+  --fd-yellow-bg: #FFF7DB;
+  --fd-yellow-border: #F0E2A8;
+  --fd-danger: #CF193A;
+  --fd-notify: #FF5A5F;
+  --fd-danger-bg: #FDEFF2;
+  --fd-danger-border: #F8CBD6;
+  --fd-danger-border-2: #F6C9D2;
+  --fd-teal: #29B9BB;
+  --fd-teal-text: #12878A;
+  --fd-teal-text-2: #20A0A2;
+  --fd-on-teal: #062B2B;
+  --fd-teal-bg: #E4F7F7;
+  --fd-teal-bg-2: #EAF7F7;
+  --fd-scroll-thumb: #E1E6F0;
+  --fd-row-hover: #F7F9FF;
+}
+:root[data-theme="dark"] {
+  --fd-surface: #1A1C23;
+  --fd-on-accent: #FFFFFF;
+  --fd-bg: #0F1116;
+  --fd-surface-2: #14161C;
+  --fd-sunken: #101319;
+  --fd-sunken-2: #101319;
+  --fd-sunken-3: #101319;
+  --fd-border: #2A2E38;
+  --fd-border-2: #363B47;
+  --fd-border-3: #333845;
+  --fd-text: #ECEEF3;
+  --fd-text-2: #C6CAD6;
+  --fd-muted: #A6AAB7;
+  --fd-faint: #8B8F9E;
+  --fd-dim: #6F7280;
+  --fd-dim-2: #6F7280;
+  --fd-dim-3: #6F7280;
+  --fd-dim-4: #565A67;
+  --fd-brand: #6C79E4;
+  --fd-brand-hover: #7B87EC;
+  --fd-accent-text: #AEB6F2;
+  --fd-accent-text-2: #B7BEF3;
+  --fd-accent-strong: #C3C9F5;
+  --fd-avatar-bg: #3B4179;
+  --fd-accent-bg: #23273B;
+  --fd-accent-bg-2: #262B42;
+  --fd-accent-bg-3: #1E2233;
+  --fd-accent-bg-4: #1C1F2E;
+  --fd-accent-border: #2E3450;
+  --fd-accent-border-2: #2C3550;
+  /* Used as the subtitle text on the (always-purple) parent header, so it
+     stays a light lavender in dark rather than becoming a dark fill. */
+  --fd-accent-strong-bg: #C6CDF5;
+  --fd-focus: #6B74BE;
+  --fd-accent-dim: #7982C2;
+  --fd-accent-dim-2: #6971A8;
+  /* Operator sidebar nav/subtitle text on the dark indigo rail — kept light
+     enough to read. */
+  --fd-accent-dim-3: #9096C0;
+  --fd-accent-dim-4: #9AA0D0;
+  --fd-green: #45C87B;
+  --fd-green-text: #63D394;
+  --fd-green-text-2: #74DBA0;
+  --fd-green-text-3: #8FD3AC;
+  --fd-green-bg: #123720;
+  --fd-green-border: #1F5537;
+  --fd-amber: #FF9D17;
+  --fd-amber-2: #F0A83A;
+  --fd-amber-text: #E6A44E;
+  --fd-amber-text-2: #E8A94F;
+  --fd-amber-text-3: #E0A050;
+  --fd-amber-text-4: #DC9A48;
+  --fd-yellow-text: #DFC468;
+  --fd-yellow-text-2: #E3C866;
+  --fd-on-amber: #3A2200;
+  --fd-amber-bg: #38290F;
+  --fd-amber-bg-2: #322510;
+  --fd-amber-bg-3: #322510;
+  --fd-amber-border: #574321;
+  --fd-amber-border-2: #63501F;
+  --fd-amber-bg-4: #2C2410;
+  --fd-yellow-bg: #322B10;
+  --fd-yellow-border: #574C24;
+  --fd-danger: #F16A83;
+  --fd-notify: #FF6B70;
+  --fd-danger-bg: #37161D;
+  --fd-danger-border: #5A2531;
+  --fd-danger-border-2: #5A2531;
+  --fd-teal: #33C9CB;
+  --fd-teal-text: #4FD6D8;
+  --fd-teal-text-2: #45CDCF;
+  --fd-on-teal: #062B2B;
+  --fd-teal-bg: #0D3233;
+  --fd-teal-bg-2: #0D3233;
+  --fd-scroll-thumb: #363B47;
+  --fd-row-hover: #202436;
+}
+
 html,
 body {
   margin: 0;
@@ -9,8 +169,8 @@ body {
 body {
   font-family: var(--font-jakarta), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background: #f7f9fb;
-  color: #18181d;
+  background: var(--fd-bg);
+  color: var(--fd-text);
 }
 
 * {
@@ -18,15 +178,15 @@ body {
 }
 
 a {
-  color: #5463d6;
+  color: var(--fd-brand);
   text-decoration: none;
 }
 a:hover {
-  color: #6476ff;
+  color: var(--fd-brand-hover);
 }
 
 ::selection {
-  background: #eef1ff;
+  background: var(--fd-accent-bg);
 }
 
 input,
@@ -40,7 +200,7 @@ textarea {
 input:focus-visible,
 textarea:focus-visible,
 button:focus-visible {
-  outline: 2px solid #b1baff;
+  outline: 2px solid var(--fd-focus);
   outline-offset: 2px;
 }
 
@@ -49,7 +209,7 @@ button:focus-visible {
   height: 8px;
 }
 .fd-scroll::-webkit-scrollbar-thumb {
-  background: #e1e6f0;
+  background: var(--fd-scroll-thumb);
   border-radius: 999px;
 }
 
@@ -159,7 +319,7 @@ button:focus-visible {
     top: var(--vvtop, 0px) !important;
     left: 0 !important;
     right: 0 !important;
-    background: #ffffff !important;
+    background: var(--fd-surface) !important;
   }
   /* iOS zooms into any input with font-size < 16px on focus, which visually
      breaks the layout when the keyboard opens. Force >=16px on phones. */
@@ -181,10 +341,14 @@ button:focus-visible {
   }
   .fd-sessionbar > div {
     padding: 4px !important;
-    gap: 0 !important;
+    gap: 4px !important;
   }
   .fd-sessionbar button {
     padding: 8px !important;
+  }
+  /* The theme toggle keeps its square tap target on phones. */
+  .fd-sessionbar .fd-theme-toggle {
+    padding: 0 !important;
   }
 
   /* Operator side rail becomes a top tab bar. */
@@ -229,24 +393,24 @@ button:focus-visible {
 
 /* Hover states — !important so they win over the ported inline base styles */
 .fd-chip:hover {
-  background: #eef1ff !important;
-  border-color: #6476ff !important;
+  background: var(--fd-accent-bg) !important;
+  border-color: var(--fd-brand-hover) !important;
 }
 .fd-source-btn:hover {
-  background: #eef1ff !important;
-  border-color: #6476ff !important;
+  background: var(--fd-accent-bg) !important;
+  border-color: var(--fd-brand-hover) !important;
 }
 .fd-send:hover {
-  background: #6476ff !important;
+  background: var(--fd-brand-hover) !important;
 }
 .fd-primary:hover {
-  background: #6476ff !important;
+  background: var(--fd-brand-hover) !important;
 }
 .fd-ghost:hover {
-  background: #f7f9fb !important;
+  background: var(--fd-bg) !important;
 }
 .fd-inbox-row:hover {
-  background: #f7f9ff !important;
+  background: var(--fd-row-hover) !important;
 }
 .fd-nav:hover {
   filter: brightness(1.12);

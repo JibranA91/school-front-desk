@@ -156,9 +156,20 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
       canvas.addEventListener("mousemove", onMove);
       canvas.addEventListener("mouseleave", onLeave);
 
+      // Canvas can't read CSS variables, so pick the palette from the active
+      // theme at draw time (light keeps the original colors exactly). Node type
+      // hues stay the same in both themes — they're categorical data colors.
+      function palette() {
+        const dark = document.documentElement.dataset.theme === "dark";
+        return dark
+          ? { edgeDim: "#262A34", edgeHot: "#6C79E4", edgeAuthored: "#6E77B4", edgeRelated: "#333845", ring: "#FFFFFF", tipBg: "#2A3160", tipText: "#FFFFFF" }
+          : { edgeDim: "#EAEEF5", edgeHot: "#5463D6", edgeAuthored: "#9FA8E0", edgeRelated: "#D9DFEA", ring: "#FFFFFF", tipBg: "#1E2549", tipText: "#FFFFFF" };
+      }
+
       function draw() {
         if (!ctx) return;
         ctx.clearRect(0, 0, width, height);
+        const C = palette();
 
         // Edges. Authored typed edges (servedBy, …) read stronger than the
         // similarity ("related") links. When hovering, only the incident edges
@@ -169,16 +180,16 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           const incident = hover && (e.source === hover.id || e.target === hover.id);
           const authored = e.rel !== "related";
           if (hover && !incident) {
-            ctx.strokeStyle = "#EAEEF5";
+            ctx.strokeStyle = C.edgeDim;
             ctx.lineWidth = 0.8;
           } else if (incident) {
-            ctx.strokeStyle = "#5463D6";
+            ctx.strokeStyle = C.edgeHot;
             ctx.lineWidth = 1.8;
           } else if (authored) {
-            ctx.strokeStyle = "#9FA8E0";
+            ctx.strokeStyle = C.edgeAuthored;
             ctx.lineWidth = 1.4;
           } else {
-            ctx.strokeStyle = "#D9DFEA";
+            ctx.strokeStyle = C.edgeRelated;
             ctx.lineWidth = 0.9;
           }
           ctx.beginPath();
@@ -198,7 +209,7 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           if (!n.handbook) {
             // Curated/seed nodes get a ring so they stand out from imports.
             ctx.lineWidth = 2;
-            ctx.strokeStyle = "#FFFFFF";
+            ctx.strokeStyle = C.ring;
             ctx.stroke();
           }
           ctx.globalAlpha = 1;
@@ -216,10 +227,10 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           let ly = hover.y - h - 6;
           if (lx + w > width) lx = width - w - 2;
           if (ly < 0) ly = hover.y + 12;
-          ctx.fillStyle = "#1E2549";
+          ctx.fillStyle = C.tipBg;
           roundRect(ctx, lx, ly, w, h, 6);
           ctx.fill();
-          ctx.fillStyle = "#FFFFFF";
+          ctx.fillStyle = C.tipText;
           ctx.textBaseline = "middle";
           ctx.fillText(label, lx + padX, ly + h / 2);
           ctx.fillStyle = colorOf(hover.type);
@@ -293,9 +304,17 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
       };
       step();
 
+      // Redraw with the right palette when the user toggles light/dark.
+      const themeObserver = new MutationObserver(() => draw());
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      });
+
       cleanup = () => {
         canvas.removeEventListener("mousemove", onMove);
         canvas.removeEventListener("mouseleave", onLeave);
+        themeObserver.disconnect();
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
       };
     })();
@@ -311,8 +330,8 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
     <div
       style={{
         marginTop: 18,
-        background: "#FFFFFF",
-        border: "1px solid #EBEFF4",
+        background: "var(--fd-surface)",
+        border: "1px solid var(--fd-border)",
         borderRadius: 20,
         padding: 20,
         boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
@@ -325,7 +344,7 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           gap: 9,
           fontSize: 15,
           fontWeight: 700,
-          color: "#18181D",
+          color: "var(--fd-text)",
         }}
       >
         <svg
@@ -333,7 +352,7 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           height="18"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#5463D6"
+          stroke="var(--fd-brand)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -344,11 +363,11 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           <path d="M8 6h8M6.5 8.5 10.5 15.5M17.5 8.5 13.5 15.5" />
         </svg>
         <span style={{ flex: 1 }}>Knowledge graph</span>
-        <span style={{ fontSize: "12.5px", color: "#737685", fontWeight: 600 }}>
+        <span style={{ fontSize: "12.5px", color: "var(--fd-faint)", fontWeight: 600 }}>
           {total} entities
         </span>
       </div>
-      <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
+      <div style={{ fontSize: "13.5px", color: "var(--fd-muted)", marginTop: 6, lineHeight: 1.5 }}>
         Every fact the front desk can draw on. Lines link related topics; curated
         facts have a white ring, imported handbook facts are solid. Hover any node
         to trace its connections.
@@ -360,8 +379,8 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           position: "relative",
           marginTop: 14,
           borderRadius: 14,
-          background: "#F7F9FB",
-          border: "1px solid #EBEFF4",
+          background: "var(--fd-bg)",
+          border: "1px solid var(--fd-border)",
           overflow: "hidden",
           minHeight: 380,
         }}
@@ -375,7 +394,7 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
               display: "grid",
               placeItems: "center",
               fontSize: 13,
-              color: "#737685",
+              color: "var(--fd-faint)",
             }}
           >
             Loading graph…
@@ -389,7 +408,7 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
               display: "grid",
               placeItems: "center",
               fontSize: 13,
-              color: "#CF193A",
+              color: "var(--fd-danger)",
             }}
           >
             {error}
@@ -411,9 +430,9 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
                   flexShrink: 0,
                 }}
               />
-              <span style={{ fontSize: "12.5px", color: "#5C5E6A", fontWeight: 600 }}>
+              <span style={{ fontSize: "12.5px", color: "var(--fd-muted)", fontWeight: 600 }}>
                 {type}
-                <span style={{ color: "#A2A6B4", fontWeight: 500 }}> {n}</span>
+                <span style={{ color: "var(--fd-dim-3)", fontWeight: 500 }}> {n}</span>
               </span>
             </div>
           ))}

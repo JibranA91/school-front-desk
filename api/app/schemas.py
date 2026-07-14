@@ -12,3 +12,4 @@ class UserOut(BaseModel):
     name: str
     role: str
     title: str | None = None
+    theme: str = "light"

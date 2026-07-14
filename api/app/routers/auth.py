@@ -34,4 +34,5 @@ def login(
         name=user.name,
         role=user.role,
         title=user.title,
+        theme=user.theme or "light",
     )

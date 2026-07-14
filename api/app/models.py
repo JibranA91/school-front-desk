@@ -35,6 +35,9 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20))  # 'parent' | 'operator'
     name: Mapped[str] = mapped_column(String(120))
     title: Mapped[str | None] = mapped_column(String(120), nullable=True)  # e.g. "Director"
+    # UI color scheme, per user: 'light' | 'dark'. Persisted so it follows the
+    # account across devices/sessions.
+    theme: Mapped[str] = mapped_column(String(10), default="light", server_default="light")
     # When the parent last opened their Updates feed — drives the unseen badge.
     updates_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

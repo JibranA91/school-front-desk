@@ -18,9 +18,9 @@ import {
 
 type Tone = "amber" | "green" | "indigo";
 const TONES: Record<Tone, { bg: string; fg: string; dot: string }> = {
-  amber: { bg: "#FFF7ED", fg: "#B5710A", dot: "#FF9D17" },
-  green: { bg: "#E7F7EE", fg: "#227A47", dot: "#3BBA6E" },
-  indigo: { bg: "#EEF1FF", fg: "#4B57B8", dot: "#5463D6" },
+  amber: { bg: "var(--fd-amber-bg-2)", fg: "var(--fd-amber-text)", dot: "var(--fd-amber)" },
+  green: { bg: "var(--fd-green-bg)", fg: "var(--fd-green-text)", dot: "var(--fd-green)" },
+  indigo: { bg: "var(--fd-accent-bg)", fg: "var(--fd-accent-text)", dot: "var(--fd-brand)" },
 };
 
 /** Group key for dedup: the stored group_key, or a fallback derived from the
@@ -215,7 +215,7 @@ function InboxRow({
         alignItems: "center",
         gap: 16,
         padding: "15px 18px",
-        borderBottom: "1px solid #F0F3F8",
+        borderBottom: "1px solid var(--fd-sunken-2)",
         cursor: "pointer",
         transition: "background .12s",
         opacity: dim ? 0.65 : 1,
@@ -236,11 +236,11 @@ function InboxRow({
         {s.label}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#18181D" }}>{item.text}</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fd-text)" }}>{item.text}</div>
         <div
           style={{
             fontSize: "12.5px",
-            color: "#737685",
+            color: "var(--fd-faint)",
             marginTop: 3,
             display: "flex",
             alignItems: "center",
@@ -257,8 +257,8 @@ function InboxRow({
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                 fontSize: "11px",
                 fontWeight: 700,
-                color: "#5463D6",
-                background: "#EEF1FF",
+                color: "var(--fd-brand)",
+                background: "var(--fd-accent-bg)",
                 padding: "1px 7px",
                 borderRadius: 6,
               }}
@@ -271,8 +271,8 @@ function InboxRow({
       {count > 1 && (
         <span
           style={{
-            background: "#FFF1DE",
-            color: "#B5710A",
+            background: "var(--fd-amber-bg)",
+            color: "var(--fd-amber-text)",
             fontSize: 11,
             fontWeight: 800,
             padding: "3px 9px",
@@ -289,7 +289,7 @@ function InboxRow({
         height="17"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#C4C8D4"
+        stroke="var(--fd-dim-4)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -335,7 +335,7 @@ function CollapsibleGroup({
           height="14"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#9AA0B4"
+          stroke="var(--fd-dim-2)"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -356,7 +356,7 @@ function CollapsibleGroup({
             fontWeight: 800,
             letterSpacing: ".05em",
             textTransform: "uppercase",
-            color: "#737685",
+            color: "var(--fd-faint)",
           }}
         >
           {group.label}
@@ -377,8 +377,8 @@ function CollapsibleGroup({
       {!collapsed && (
         <div
           style={{
-            background: "#FFFFFF",
-            border: "1px solid #EBEFF4",
+            background: "var(--fd-surface)",
+            border: "1px solid var(--fd-border)",
             borderRadius: 16,
             overflow: "hidden",
             boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
@@ -408,8 +408,8 @@ function TranscriptBubble({ m }: { m: Msg }) {
       style={{
         alignSelf: isUser ? "flex-end" : "flex-start",
         maxWidth: "88%",
-        background: isUser ? "#5463D6" : isStaff ? "#EAF7F7" : "#F1F4FF",
-        color: isUser ? "#FFFFFF" : "#18181D",
+        background: isUser ? "var(--fd-brand)" : isStaff ? "var(--fd-teal-bg-2)" : "var(--fd-accent-bg-3)",
+        color: isUser ? "var(--fd-on-accent)" : "var(--fd-text)",
         fontSize: "13.5px",
         lineHeight: 1.5,
         padding: "10px 13px",
@@ -418,16 +418,16 @@ function TranscriptBubble({ m }: { m: Msg }) {
       }}
     >
       {isStaff && (
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#12878A", marginBottom: 3 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--fd-teal-text)", marginBottom: 3 }}>
           {m.by ?? "Staff"} · staff reply
         </div>
       )}
       {body}
       {m.citation && !isUser && !isStaff && (
-        <div style={{ fontSize: 11, color: "#737685", marginTop: 5 }}>{m.citation}</div>
+        <div style={{ fontSize: 11, color: "var(--fd-faint)", marginTop: 5 }}>{m.citation}</div>
       )}
       {Array.isArray(m.menu) && m.menu.length > 0 && (
-        <div style={{ fontSize: 12, color: "#5C5E6A", marginTop: 5 }}>
+        <div style={{ fontSize: 12, color: "var(--fd-muted)", marginTop: 5 }}>
           {m.menu.join(" · ")}
         </div>
       )}
@@ -436,8 +436,8 @@ function TranscriptBubble({ m }: { m: Msg }) {
 }
 
 const primaryBtn = (busy = false): CSSProperties => ({
-  background: busy ? "#9AA3E6" : "#5463D6",
-  color: "#FFFFFF",
+  background: busy ? "var(--fd-accent-dim)" : "var(--fd-brand)",
+  color: "var(--fd-on-accent)",
   border: "none",
   borderRadius: 11,
   padding: "10px 18px",
@@ -449,8 +449,8 @@ const primaryBtn = (busy = false): CSSProperties => ({
 
 const ghostBtn: CSSProperties = {
   background: "transparent",
-  color: "#5C5E6A",
-  border: "1px solid #EBEFF4",
+  color: "var(--fd-muted)",
+  border: "1px solid var(--fd-border)",
   borderRadius: 11,
   padding: "10px 18px",
   fontSize: "13.5px",
@@ -604,13 +604,13 @@ export default function InboxPanel({
             style={{
               fontSize: 24,
               fontWeight: 800,
-              color: "#18181D",
+              color: "var(--fd-text)",
               letterSpacing: "-.01em",
             }}
           >
             Inbox
           </div>
-          <div style={{ fontSize: 14, color: "#5C5E6A", marginTop: 4 }}>
+          <div style={{ fontSize: 14, color: "var(--fd-muted)", marginTop: 4 }}>
             Escalations and knowledge gaps need you; everything else the AI
             already handled. Answer a gap once and it&apos;s folded into the
             knowledge base for the next parent.
@@ -624,7 +624,7 @@ export default function InboxPanel({
           </div>
 
           {!loading && stats.attention === 0 && (
-            <div style={{ marginTop: 12, fontSize: 13, color: "#227A47", fontWeight: 600 }}>
+            <div style={{ marginTop: 12, fontSize: 13, color: "var(--fd-green-text)", fontWeight: 600 }}>
               ✓ You&apos;re all caught up — nothing needs you right now.
             </div>
           )}
@@ -639,7 +639,7 @@ export default function InboxPanel({
               flexWrap: "wrap",
             }}
           >
-            <span style={{ fontSize: "12.5px", color: "#737685", fontWeight: 600, marginRight: 2 }}>
+            <span style={{ fontSize: "12.5px", color: "var(--fd-faint)", fontWeight: 600, marginRight: 2 }}>
               Group by
             </span>
             {(Object.keys(GROUP_BY_LABELS) as GroupBy[]).map((g) => (
@@ -653,9 +653,9 @@ export default function InboxPanel({
                   fontWeight: 700,
                   cursor: "pointer",
                   transition: "all .15s",
-                  border: `1px solid ${groupBy === g ? "#5463D6" : "#E3E8FF"}`,
-                  background: groupBy === g ? "#5463D6" : "#FFFFFF",
-                  color: groupBy === g ? "#FFFFFF" : "#5463D6",
+                  border: `1px solid ${groupBy === g ? "var(--fd-brand)" : "var(--fd-accent-bg-2)"}`,
+                  background: groupBy === g ? "var(--fd-brand)" : "var(--fd-surface)",
+                  color: groupBy === g ? "var(--fd-on-accent)" : "var(--fd-brand)",
                 }}
               >
                 {GROUP_BY_LABELS[g]}
@@ -664,11 +664,11 @@ export default function InboxPanel({
           </div>
 
           {loading ? (
-            <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
+            <div style={{ padding: 28, fontSize: 14, color: "var(--fd-faint)" }}>
               Loading inbox…
             </div>
           ) : grouped.length === 0 ? (
-            <div style={{ padding: 28, fontSize: 14, color: "#737685" }}>
+            <div style={{ padding: 28, fontSize: 14, color: "var(--fd-faint)" }}>
               No questions yet.
             </div>
           ) : (
@@ -799,7 +799,7 @@ function InquiryDetail({
           gap: 6,
           background: "transparent",
           border: "none",
-          color: "#5463D6",
+          color: "var(--fd-brand)",
           fontSize: 13,
           fontWeight: 700,
           cursor: "pointer",
@@ -824,8 +824,8 @@ function InquiryDetail({
 
       <div
         style={{
-          background: "#FFFFFF",
-          border: "1px solid #EBEFF4",
+          background: "var(--fd-surface)",
+          border: "1px solid var(--fd-border)",
           borderRadius: 20,
           padding: 22,
           boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
@@ -847,8 +847,8 @@ function InquiryDetail({
           {sensitive && (
             <span
               style={{
-                background: "#FDEFF2",
-                color: "#CF193A",
+                background: "var(--fd-danger-bg)",
+                color: "var(--fd-danger)",
                 padding: "5px 11px",
                 borderRadius: 999,
                 fontSize: 12,
@@ -861,8 +861,8 @@ function InquiryDetail({
           {item.group_count > 1 && (
             <span
               style={{
-                background: "#FFF1DE",
-                color: "#B5710A",
+                background: "var(--fd-amber-bg)",
+                color: "var(--fd-amber-text)",
                 padding: "5px 11px",
                 borderRadius: 999,
                 fontSize: 12,
@@ -874,13 +874,13 @@ function InquiryDetail({
           )}
         </div>
 
-        <div style={{ fontSize: 19, fontWeight: 700, color: "#18181D", marginTop: 14 }}>
+        <div style={{ fontSize: 19, fontWeight: 700, color: "var(--fd-text)", marginTop: 14 }}>
           {item.text}
         </div>
         <div
           style={{
             fontSize: "13px",
-            color: "#737685",
+            color: "var(--fd-faint)",
             marginTop: 6,
             display: "flex",
             alignItems: "center",
@@ -897,8 +897,8 @@ function InquiryDetail({
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                 fontSize: "11.5px",
                 fontWeight: 700,
-                color: "#5463D6",
-                background: "#EEF1FF",
+                color: "var(--fd-brand)",
+                background: "var(--fd-accent-bg)",
                 padding: "2px 8px",
                 borderRadius: 6,
               }}
@@ -912,11 +912,11 @@ function InquiryDetail({
           <div
             style={{
               marginTop: 16,
-              background: "#F7F9FB",
+              background: "var(--fd-bg)",
               borderRadius: 12,
               padding: "12px 14px",
               fontSize: 14,
-              color: "#3E4252",
+              color: "var(--fd-text-2)",
             }}
           >
             <b>Resolution:</b> {item.resolution_text}
@@ -929,14 +929,14 @@ function InquiryDetail({
         <div
           style={{
             marginTop: 18,
-            background: "#FFFFFF",
-            border: "1px solid #EBEFF4",
+            background: "var(--fd-surface)",
+            border: "1px solid var(--fd-border)",
             borderRadius: 20,
             padding: 20,
             boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--fd-text)" }}>
             Conversation
           </div>
           <div
@@ -963,17 +963,17 @@ function InquiryDetail({
         <div
           style={{
             marginTop: 18,
-            background: "#FFFFFF",
-            border: "1px solid #EBEFF4",
+            background: "var(--fd-surface)",
+            border: "1px solid var(--fd-border)",
             borderRadius: 20,
             padding: 22,
             boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--fd-text)" }}>
             Reply to {item.who}
           </div>
-          <div style={{ fontSize: "13px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
+          <div style={{ fontSize: "13px", color: "var(--fd-muted)", marginTop: 6, lineHeight: 1.5 }}>
             A private message in this parent&apos;s chat. It is{" "}
             <b>not</b> added to the knowledge base and the AI never sees it.
           </div>
@@ -984,19 +984,19 @@ function InquiryDetail({
             style={{
               width: "100%",
               marginTop: 13,
-              background: "#F7F9FB",
-              border: "1px solid #EBEFF4",
+              background: "var(--fd-bg)",
+              border: "1px solid var(--fd-border)",
               borderRadius: 14,
               padding: 14,
               fontSize: "14.5px",
               lineHeight: 1.5,
-              color: "#18181D",
+              color: "var(--fd-text)",
               minHeight: 76,
               resize: "none",
             }}
           />
           {replyErr && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "#CF193A", fontWeight: 600 }}>
+            <div style={{ marginTop: 10, fontSize: 13, color: "var(--fd-danger)", fontWeight: 600 }}>
               {replyErr}
             </div>
           )}
@@ -1011,12 +1011,12 @@ function InquiryDetail({
         <div
           style={{
             marginTop: 18,
-            background: "#F7F9FB",
-            border: "1px dashed #D9DFEA",
+            background: "var(--fd-bg)",
+            border: "1px dashed var(--fd-border-2)",
             borderRadius: 14,
             padding: "14px 16px",
             fontSize: 13,
-            color: "#737685",
+            color: "var(--fd-faint)",
           }}
         >
           No parent account is linked to this inquiry, so there&apos;s no chat to
@@ -1029,17 +1029,17 @@ function InquiryDetail({
         <div
           style={{
             marginTop: 18,
-            background: "#FFFFFF",
-            border: "1px solid #EBEFF4",
+            background: "var(--fd-surface)",
+            border: "1px solid var(--fd-border)",
             borderRadius: 20,
             padding: 22,
             boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--fd-text)" }}>
             Answer &amp; teach Sunnyside
           </div>
-          <div style={{ fontSize: "13px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
+          <div style={{ fontSize: "13px", color: "var(--fd-muted)", marginTop: 6, lineHeight: 1.5 }}>
             {sensitive
               ? "Reply for your records. Sensitive topics still escalate to staff even after you add a note."
               : "Write the answer in plain language. I'll fold it into the knowledge base so the next parent who asks gets it instantly and grounded."}
@@ -1056,20 +1056,20 @@ function InquiryDetail({
             style={{
               width: "100%",
               marginTop: 13,
-              background: "#F7F9FB",
-              border: "1px solid #EBEFF4",
+              background: "var(--fd-bg)",
+              border: "1px solid var(--fd-border)",
               borderRadius: 14,
               padding: 14,
               fontSize: "14.5px",
               lineHeight: 1.5,
-              color: "#18181D",
+              color: "var(--fd-text)",
               minHeight: 84,
               resize: "none",
             }}
           />
 
           {err && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "#CF193A", fontWeight: 600 }}>
+            <div style={{ marginTop: 10, fontSize: 13, color: "var(--fd-danger)", fontWeight: 600 }}>
               {err}
             </div>
           )}
@@ -1103,7 +1103,7 @@ function InquiryDetail({
                   fontWeight: 700,
                   letterSpacing: ".04em",
                   textTransform: "uppercase",
-                  color: "#737685",
+                  color: "var(--fd-faint)",
                 }}
               >
                 {proposal.summary}
@@ -1116,16 +1116,16 @@ function InquiryDetail({
                         style={{
                           display: "flex",
                           gap: 10,
-                          background: "#FDEFF2",
+                          background: "var(--fd-danger-bg)",
                           borderRadius: 10,
                           padding: "11px 13px",
                         }}
                       >
-                        <span style={{ color: "#CF193A", fontWeight: 800 }}>–</span>
+                        <span style={{ color: "var(--fd-danger)", fontWeight: 800 }}>–</span>
                         <span
                           style={{
                             fontSize: 14,
-                            color: "#9497A6",
+                            color: "var(--fd-dim)",
                             textDecoration: "line-through",
                           }}
                         >
@@ -1137,13 +1137,13 @@ function InquiryDetail({
                       style={{
                         display: "flex",
                         gap: 10,
-                        background: "#E7F7EE",
+                        background: "var(--fd-green-bg)",
                         borderRadius: 10,
                         padding: "11px 13px",
                       }}
                     >
-                      <span style={{ color: "#227A47", fontWeight: 800 }}>+</span>
-                      <span style={{ fontSize: 14, color: "#18181D", fontWeight: 600 }}>
+                      <span style={{ color: "var(--fd-green-text)", fontWeight: 800 }}>+</span>
+                      <span style={{ fontSize: 14, color: "var(--fd-text)", fontWeight: 600 }}>
                         {c.name} · {c.field}: {c.new_value}
                       </span>
                     </div>
@@ -1155,13 +1155,13 @@ function InquiryDetail({
                 <div
                   style={{
                     marginTop: 14,
-                    border: "1px solid #F6D9A6",
-                    background: "#FFF9EF",
+                    border: "1px solid var(--fd-amber-border-2)",
+                    background: "var(--fd-amber-bg-4)",
                     borderRadius: 14,
                     padding: 15,
                   }}
                 >
-                  <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#8A5A00" }}>
+                  <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--fd-amber-text-4)" }}>
                     This conflicts with a fact on file ({conflict.old_value}). Which
                     should parents see?
                   </div>
@@ -1215,8 +1215,8 @@ function InquiryDetail({
         <div
           style={{
             marginTop: 18,
-            background: "#E7F7EE",
-            border: "1px solid #BFE9CF",
+            background: "var(--fd-green-bg)",
+            border: "1px solid var(--fd-green-border)",
             borderRadius: 16,
             padding: "16px 18px",
             display: "flex",
@@ -1230,7 +1230,7 @@ function InquiryDetail({
               width: 32,
               height: 32,
               borderRadius: 999,
-              background: "#3BBA6E",
+              background: "var(--fd-green)",
               display: "grid",
               placeItems: "center",
               flexShrink: 0,
@@ -1241,7 +1241,7 @@ function InquiryDetail({
               height="17"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#FFFFFF"
+              stroke="var(--fd-on-accent)"
               strokeWidth="2.6"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -1250,11 +1250,11 @@ function InquiryDetail({
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: "14.5px", fontWeight: 700, color: "#1A6B3D" }}>
+            <div style={{ fontSize: "14.5px", fontWeight: 700, color: "var(--fd-green-text-2)" }}>
               Resolved{resolvedCount > 1 ? ` ${resolvedCount} grouped questions` : ""} —
               the next parent who asks gets it instantly.
             </div>
-            <div style={{ fontSize: "12.5px", color: "#3E8259", marginTop: 2 }}>
+            <div style={{ fontSize: "12.5px", color: "var(--fd-green-text-3)", marginTop: 2 }}>
               Logged to the changelog and folded into the knowledge graph.
             </div>
           </div>

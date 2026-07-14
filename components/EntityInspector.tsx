@@ -22,8 +22,8 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 const card = {
   marginTop: 18,
-  background: "#FFFFFF",
-  border: "1px solid #EBEFF4",
+  background: "var(--fd-surface)",
+  border: "1px solid var(--fd-border)",
   borderRadius: 20,
   padding: 20,
   boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
@@ -100,7 +100,7 @@ export default function EntityInspector({
           gap: 9,
           fontSize: 15,
           fontWeight: 700,
-          color: "#18181D",
+          color: "var(--fd-text)",
         }}
       >
         <svg
@@ -108,7 +108,7 @@ export default function EntityInspector({
           height="18"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#5463D6"
+          stroke="var(--fd-brand)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -116,11 +116,11 @@ export default function EntityInspector({
           <path d="M4 6h16M4 12h16M4 18h10" />
         </svg>
         <span style={{ flex: 1 }}>Browse &amp; edit knowledge</span>
-        <span style={{ fontSize: "12.5px", color: "#737685", fontWeight: 600 }}>
+        <span style={{ fontSize: "12.5px", color: "var(--fd-faint)", fontWeight: 600 }}>
           {counts.all} entries
         </span>
       </div>
-      <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
+      <div style={{ fontSize: "13.5px", color: "var(--fd-muted)", marginTop: 6, lineHeight: 1.5 }}>
         Inspect every fact the front desk can draw on. Edit a value directly, or
         remove one that&apos;s out of date.
       </div>
@@ -133,12 +133,12 @@ export default function EntityInspector({
           placeholder="Search by name, type, or id…"
           style={{
             flex: "1 1 220px",
-            background: "#F7F9FB",
-            border: "1px solid #EBEFF4",
+            background: "var(--fd-bg)",
+            border: "1px solid var(--fd-border)",
             borderRadius: 11,
             padding: "10px 13px",
             fontSize: "13.5px",
-            color: "#18181D",
+            color: "var(--fd-text)",
           }}
         />
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -151,9 +151,9 @@ export default function EntityInspector({
                 style={{
                   padding: "8px 13px",
                   borderRadius: 999,
-                  border: active ? "1px solid #5463D6" : "1px solid #E3E8FF",
-                  background: active ? "#5463D6" : "#F5F7FF",
-                  color: active ? "#FFFFFF" : "#5463D6",
+                  border: active ? "1px solid var(--fd-brand)" : "1px solid var(--fd-accent-bg-2)",
+                  background: active ? "var(--fd-brand)" : "var(--fd-accent-bg-4)",
+                  color: active ? "var(--fd-on-accent)" : "var(--fd-brand)",
                   fontSize: "12.5px",
                   fontWeight: 600,
                   cursor: "pointer",
@@ -175,18 +175,18 @@ export default function EntityInspector({
           marginTop: 14,
           maxHeight: 340,
           overflowY: "auto",
-          border: "1px solid #EBEFF4",
+          border: "1px solid var(--fd-border)",
           borderRadius: 14,
         }}
       >
         {loading && (
-          <div style={{ padding: 20, fontSize: 13, color: "#737685" }}>Loading…</div>
+          <div style={{ padding: 20, fontSize: 13, color: "var(--fd-faint)" }}>Loading…</div>
         )}
         {error && (
-          <div style={{ padding: 20, fontSize: 13, color: "#CF193A" }}>{error}</div>
+          <div style={{ padding: 20, fontSize: 13, color: "var(--fd-danger)" }}>{error}</div>
         )}
         {!loading && !error && visible.length === 0 && (
-          <div style={{ padding: 20, fontSize: 13, color: "#737685" }}>
+          <div style={{ padding: 20, fontSize: 13, color: "var(--fd-faint)" }}>
             No entries match.
           </div>
         )}
@@ -204,7 +204,7 @@ export default function EntityInspector({
                 textAlign: "left",
                 background: "transparent",
                 border: "none",
-                borderTop: i === 0 ? "none" : "1px solid #F0F2F7",
+                borderTop: i === 0 ? "none" : "1px solid var(--fd-sunken)",
                 padding: "12px 14px",
                 cursor: "pointer",
                 fontFamily: "inherit",
@@ -215,7 +215,7 @@ export default function EntityInspector({
                   style={{
                     fontSize: "13.5px",
                     fontWeight: 700,
-                    color: "#18181D",
+                    color: "var(--fd-text)",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -223,7 +223,7 @@ export default function EntityInspector({
                 >
                   {e.name}
                 </div>
-                <div style={{ fontSize: "11.5px", color: "#9497A6", marginTop: 2 }}>
+                <div style={{ fontSize: "11.5px", color: "var(--fd-dim)", marginTop: 2 }}>
                   {e.type} · {e.connections} link{e.connections === 1 ? "" : "s"}
                 </div>
               </div>
@@ -245,7 +245,7 @@ export default function EntityInspector({
                 height="15"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#C4C8D4"
+                stroke="var(--fd-dim-4)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -338,7 +338,7 @@ function EntityEditor({
         onClick={(e) => e.stopPropagation()}
         className="fd-scroll"
         style={{
-          background: "#FFFFFF",
+          background: "var(--fd-surface)",
           borderRadius: 22,
           maxWidth: 520,
           width: "100%",
@@ -361,7 +361,7 @@ function EntityEditor({
           >
             {o.label}
           </span>
-          <code style={{ fontSize: "11.5px", color: "#9497A6" }}>{entity.id}</code>
+          <code style={{ fontSize: "11.5px", color: "var(--fd-dim)" }}>{entity.id}</code>
         </div>
 
         <label style={labelStyle}>Name</label>
@@ -372,11 +372,11 @@ function EntityEditor({
 
         <label style={labelStyle}>Attributes</label>
         {fields.length === 0 && (
-          <div style={{ fontSize: "12.5px", color: "#9497A6" }}>No attributes.</div>
+          <div style={{ fontSize: "12.5px", color: "var(--fd-dim)" }}>No attributes.</div>
         )}
         {fields.map((f, i) => (
           <div key={f.key} style={{ marginTop: 8 }}>
-            <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#737685" }}>
+            <div style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--fd-faint)" }}>
               {f.key}
             </div>
             <textarea
@@ -391,12 +391,12 @@ function EntityEditor({
           <div
             style={{
               marginTop: 14,
-              background: "#FFF7DB",
-              border: "1px solid #F0E2A8",
+              background: "var(--fd-yellow-bg)",
+              border: "1px solid var(--fd-yellow-border)",
               borderRadius: 10,
               padding: "9px 12px",
               fontSize: "12px",
-              color: "#8A6D12",
+              color: "var(--fd-yellow-text)",
             }}
           >
             This is curated demo data — the seed backbone. Edits and deletes stick
@@ -405,7 +405,7 @@ function EntityEditor({
         )}
 
         {err && (
-          <div style={{ marginTop: 12, fontSize: "12.5px", color: "#CF193A", fontWeight: 600 }}>
+          <div style={{ marginTop: 12, fontSize: "12.5px", color: "var(--fd-danger)", fontWeight: 600 }}>
             {err}
           </div>
         )}
@@ -424,8 +424,8 @@ function EntityEditor({
               disabled={busy}
               style={{
                 background: "transparent",
-                color: "#CF193A",
-                border: "1px solid #F6C9D2",
+                color: "var(--fd-danger)",
+                border: "1px solid var(--fd-danger-border-2)",
                 borderRadius: 11,
                 padding: "10px 16px",
                 fontSize: "13px",
@@ -440,8 +440,8 @@ function EntityEditor({
               onClick={remove}
               disabled={busy}
               style={{
-                background: "#CF193A",
-                color: "#FFFFFF",
+                background: "var(--fd-danger)",
+                color: "var(--fd-on-accent)",
                 border: "none",
                 borderRadius: 11,
                 padding: "10px 16px",
@@ -459,8 +459,8 @@ function EntityEditor({
             disabled={busy}
             style={{
               background: "transparent",
-              color: "#5C5E6A",
-              border: "1px solid #EBEFF4",
+              color: "var(--fd-muted)",
+              border: "1px solid var(--fd-border)",
               borderRadius: 11,
               padding: "10px 18px",
               fontSize: "13.5px",
@@ -474,8 +474,8 @@ function EntityEditor({
             onClick={save}
             disabled={busy}
             style={{
-              background: "#5463D6",
-              color: "#FFFFFF",
+              background: "var(--fd-brand)",
+              color: "var(--fd-on-accent)",
               border: "none",
               borderRadius: 11,
               padding: "10px 18px",
@@ -499,19 +499,19 @@ const labelStyle = {
   fontWeight: 700,
   letterSpacing: ".04em",
   textTransform: "uppercase",
-  color: "#737685",
+  color: "var(--fd-faint)",
   marginTop: 16,
   marginBottom: 6,
 } as const;
 
 const inputStyle = {
   width: "100%",
-  background: "#F7F9FB",
-  border: "1px solid #EBEFF4",
+  background: "var(--fd-bg)",
+  border: "1px solid var(--fd-border)",
   borderRadius: 11,
   padding: "10px 13px",
   fontSize: "13.5px",
-  color: "#18181D",
+  color: "var(--fd-text)",
   fontFamily: "inherit",
   lineHeight: 1.5,
 } as const;

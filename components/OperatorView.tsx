@@ -34,8 +34,8 @@ function navBtn(active: boolean): CSSProperties {
     fontFamily: "inherit",
     fontSize: 14,
     fontWeight: 600,
-    background: active ? "#5463D6" : "transparent",
-    color: active ? "#FFFFFF" : "#AEB4D6",
+    background: active ? "var(--fd-brand)" : "transparent",
+    color: active ? "var(--fd-on-accent)" : "var(--fd-accent-dim-3)",
     transition: "background .15s",
   };
 }
@@ -198,8 +198,8 @@ export default function OperatorView({
         margin: "0 auto",
         height: "calc(100vh - 118px)",
         minHeight: 620,
-        background: "#FFFFFF",
-        border: "1px solid #EBEFF4",
+        background: "var(--fd-surface)",
+        border: "1px solid var(--fd-border)",
         borderRadius: 24,
         boxShadow: "0 30px 70px -30px rgba(30,37,73,.3)",
         overflow: "hidden",
@@ -213,7 +213,7 @@ export default function OperatorView({
         style={{
           width: 248,
           flexShrink: 0,
-          background: "#1E2549",
+          background: "var(--fd-avatar-bg)",
           padding: "22px 16px",
           display: "flex",
           flexDirection: "column",
@@ -233,7 +233,7 @@ export default function OperatorView({
               width: 38,
               height: 38,
               borderRadius: 11,
-              background: "#5463D6",
+              background: "var(--fd-brand)",
               display: "grid",
               placeItems: "center",
               flexShrink: 0,
@@ -244,7 +244,7 @@ export default function OperatorView({
               height="21"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#FFFFFF"
+              stroke="var(--fd-on-accent)"
               strokeWidth="2.2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -256,7 +256,7 @@ export default function OperatorView({
           <div>
             <div
               style={{
-                color: "#FFFFFF",
+                color: "var(--fd-on-accent)",
                 fontSize: "14.5px",
                 fontWeight: 700,
                 lineHeight: 1.1,
@@ -266,7 +266,7 @@ export default function OperatorView({
             </div>
             <div
               style={{
-                color: "#8188B8",
+                color: "var(--fd-accent-dim-4)",
                 fontSize: "11.5px",
                 fontWeight: 600,
                 marginTop: 2,
@@ -303,8 +303,8 @@ export default function OperatorView({
             {inboxCount != null && inboxCount > 0 && (
               <span
                 style={{
-                  background: "#FF9D17",
-                  color: "#3A2200",
+                  background: "var(--fd-amber)",
+                  color: "var(--fd-on-amber)",
                   fontSize: 11,
                   fontWeight: 800,
                   padding: "2px 8px",
@@ -366,7 +366,7 @@ export default function OperatorView({
             alignItems: "center",
             gap: 10,
             padding: "12px 8px 0",
-            borderTop: "1px solid #2D355F",
+            borderTop: "1px solid var(--fd-accent-strong)",
           }}
         >
           <div
@@ -374,8 +374,8 @@ export default function OperatorView({
               width: 34,
               height: 34,
               borderRadius: 999,
-              background: "#29B9BB",
-              color: "#062B2B",
+              background: "var(--fd-teal)",
+              color: "var(--fd-on-teal)",
               fontSize: "12.5px",
               fontWeight: 800,
               display: "grid",
@@ -388,7 +388,7 @@ export default function OperatorView({
           <div>
             <div
               style={{
-                color: "#FFFFFF",
+                color: "var(--fd-on-accent)",
                 fontSize: 13,
                 fontWeight: 700,
                 lineHeight: 1.1,
@@ -397,7 +397,7 @@ export default function OperatorView({
               {operatorName}
             </div>
             <div
-              style={{ color: "#8188B8", fontSize: "11.5px", marginTop: 2 }}
+              style={{ color: "var(--fd-accent-dim-4)", fontSize: "11.5px", marginTop: 2 }}
             >
               {operatorTitle}
             </div>
@@ -408,7 +408,7 @@ export default function OperatorView({
       {/* Main panel */}
       <div
         className="fd-scroll"
-        style={{ flex: 1, overflowY: "auto", background: "#F7F9FB" }}
+        style={{ flex: 1, overflowY: "auto", background: "var(--fd-bg)" }}
       >
         {nav === "inbox" && (
           <InboxPanel
@@ -427,13 +427,13 @@ export default function OperatorView({
               style={{
                 fontSize: 24,
                 fontWeight: 800,
-                color: "#18181D",
+                color: "var(--fd-text)",
                 letterSpacing: "-.01em",
               }}
             >
               Knowledge
             </div>
-            <div style={{ fontSize: 14, color: "#5C5E6A", marginTop: 4 }}>
+            <div style={{ fontSize: 14, color: "var(--fd-muted)", marginTop: 4 }}>
               Teach the front desk in plain language. I&apos;ll turn it into a
               precise change and check it against what parents already see.
             </div>
@@ -442,8 +442,8 @@ export default function OperatorView({
             <div
               style={{
                 marginTop: 22,
-                background: "#FFFFFF",
-                border: "1px solid #EBEFF4",
+                background: "var(--fd-surface)",
+                border: "1px solid var(--fd-border)",
                 borderRadius: 20,
                 padding: 20,
                 boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
@@ -456,7 +456,7 @@ export default function OperatorView({
                   gap: 9,
                   fontSize: 15,
                   fontWeight: 700,
-                  color: "#18181D",
+                  color: "var(--fd-text)",
                 }}
               >
                 <svg
@@ -464,7 +464,7 @@ export default function OperatorView({
                   height="18"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#5463D6"
+                  stroke="var(--fd-brand)"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -478,7 +478,7 @@ export default function OperatorView({
               <div
                 style={{
                   fontSize: "13.5px",
-                  color: "#5C5E6A",
+                  color: "var(--fd-muted)",
                   marginTop: 8,
                   lineHeight: 1.5,
                 }}
@@ -509,8 +509,8 @@ export default function OperatorView({
                   onClick={() => fileRef.current?.click()}
                   disabled={ingesting}
                   style={{
-                    background: ingesting ? "#9AA3E6" : "#5463D6",
-                    color: "#FFFFFF",
+                    background: ingesting ? "var(--fd-accent-dim)" : "var(--fd-brand)",
+                    color: "var(--fd-on-accent)",
                     border: "none",
                     borderRadius: 12,
                     padding: "11px 20px",
@@ -531,7 +531,7 @@ export default function OperatorView({
                         height: 15,
                         borderRadius: 999,
                         border: "2px solid rgba(255,255,255,.4)",
-                        borderTopColor: "#FFFFFF",
+                        borderTopColor: "var(--fd-on-accent)",
                         display: "inline-block",
                         animation: "fdSpin .7s linear infinite",
                       }}
@@ -539,7 +539,7 @@ export default function OperatorView({
                   )}
                   {ingesting ? "Reading your handbook…" : "Upload PDF"}
                 </button>
-                <div style={{ flex: 1, fontSize: "12.5px", color: "#737685" }}>
+                <div style={{ flex: 1, fontSize: "12.5px", color: "var(--fd-faint)" }}>
                   {ingesting
                     ? ingestStatus || "Starting…"
                     : "PDF only. Existing curated facts stay untouched."}
@@ -550,12 +550,12 @@ export default function OperatorView({
                 <div
                   style={{
                     marginTop: 14,
-                    background: "#FDEFF2",
-                    border: "1px solid #F6C9D2",
+                    background: "var(--fd-danger-bg)",
+                    border: "1px solid var(--fd-danger-border-2)",
                     borderRadius: 12,
                     padding: "12px 14px",
                     fontSize: "13.5px",
-                    color: "#CF193A",
+                    color: "var(--fd-danger)",
                     fontWeight: 600,
                   }}
                 >
@@ -567,8 +567,8 @@ export default function OperatorView({
                 <div
                   style={{
                     marginTop: 14,
-                    background: "#E7F7EE",
-                    border: "1px solid #BFE9CF",
+                    background: "var(--fd-green-bg)",
+                    border: "1px solid var(--fd-green-border)",
                     borderRadius: 14,
                     padding: "14px 16px",
                     animation: "fdUp .3s ease both",
@@ -578,7 +578,7 @@ export default function OperatorView({
                     style={{
                       fontSize: "14.5px",
                       fontWeight: 700,
-                      color: "#1A6B3D",
+                      color: "var(--fd-green-text-2)",
                     }}
                   >
                     Imported {ingestReport.created} entries from{" "}
@@ -590,7 +590,7 @@ export default function OperatorView({
                   <div
                     style={{
                       fontSize: "12.5px",
-                      color: "#3E8259",
+                      color: "var(--fd-green-text-3)",
                       marginTop: 3,
                     }}
                   >
@@ -612,9 +612,9 @@ export default function OperatorView({
                         <span
                           key={type}
                           style={{
-                            background: "#FFFFFF",
-                            border: "1px solid #BFE9CF",
-                            color: "#227A47",
+                            background: "var(--fd-surface)",
+                            border: "1px solid var(--fd-green-border)",
+                            color: "var(--fd-green-text)",
                             fontSize: "11.5px",
                             fontWeight: 700,
                             padding: "4px 10px",
@@ -632,8 +632,8 @@ export default function OperatorView({
             <div
               style={{
                 marginTop: 18,
-                background: "#FFFFFF",
-                border: "1px solid #EBEFF4",
+                background: "var(--fd-surface)",
+                border: "1px solid var(--fd-border)",
                 borderRadius: 20,
                 padding: 20,
                 boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
@@ -646,7 +646,7 @@ export default function OperatorView({
                   gap: 9,
                   fontSize: 15,
                   fontWeight: 700,
-                  color: "#18181D",
+                  color: "var(--fd-text)",
                 }}
               >
                 <svg
@@ -654,7 +654,7 @@ export default function OperatorView({
                   height="18"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#5463D6"
+                  stroke="var(--fd-brand)"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -670,13 +670,13 @@ export default function OperatorView({
                 style={{
                   width: "100%",
                   marginTop: 13,
-                  background: "#F7F9FB",
-                  border: "1px solid #EBEFF4",
+                  background: "var(--fd-bg)",
+                  border: "1px solid var(--fd-border)",
                   borderRadius: 14,
                   padding: 14,
                   fontSize: "14.5px",
                   lineHeight: 1.5,
-                  color: "#18181D",
+                  color: "var(--fd-text)",
                   minHeight: 88,
                   resize: "none",
                 }}
@@ -697,9 +697,9 @@ export default function OperatorView({
                     style={{
                       padding: "8px 13px",
                       borderRadius: 999,
-                      border: "1px solid #E3E8FF",
-                      background: "#F5F7FF",
-                      color: "#5463D6",
+                      border: "1px solid var(--fd-accent-bg-2)",
+                      background: "var(--fd-accent-bg-4)",
+                      color: "var(--fd-brand)",
                       fontSize: "12.5px",
                       fontWeight: 600,
                       cursor: "pointer",
@@ -718,7 +718,7 @@ export default function OperatorView({
                   marginTop: 16,
                 }}
               >
-                <div style={{ flex: 1, fontSize: "12.5px", color: "#737685" }}>
+                <div style={{ flex: 1, fontSize: "12.5px", color: "var(--fd-faint)" }}>
                   I&apos;ll draft an exact edit and flag any conflicts before
                   anything goes live.
                 </div>
@@ -727,8 +727,8 @@ export default function OperatorView({
                   onClick={propose}
                   disabled={busy}
                   style={{
-                    background: busy ? "#9AA3E6" : "#5463D6",
-                    color: "#FFFFFF",
+                    background: busy ? "var(--fd-accent-dim)" : "var(--fd-brand)",
+                    color: "var(--fd-on-accent)",
                     border: "none",
                     borderRadius: 12,
                     padding: "11px 20px",
@@ -749,7 +749,7 @@ export default function OperatorView({
                         height: 15,
                         borderRadius: 999,
                         border: "2px solid rgba(255,255,255,.4)",
-                        borderTopColor: "#FFFFFF",
+                        borderTopColor: "var(--fd-on-accent)",
                         display: "inline-block",
                         animation: "fdSpin .7s linear infinite",
                       }}
@@ -766,8 +766,8 @@ export default function OperatorView({
               <div
                 style={{
                   marginTop: 18,
-                  background: "#FFFFFF",
-                  border: "1px solid #EBEFF4",
+                  background: "var(--fd-surface)",
+                  border: "1px solid var(--fd-border)",
                   borderRadius: 20,
                   padding: 20,
                   boxShadow: "0 8px 24px -18px rgba(30,37,73,.3)",
@@ -782,7 +782,7 @@ export default function OperatorView({
                     height="17"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#5463D6"
+                    stroke="var(--fd-brand)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -794,15 +794,15 @@ export default function OperatorView({
                       flex: 1,
                       fontSize: 15,
                       fontWeight: 700,
-                      color: "#18181D",
+                      color: "var(--fd-text)",
                     }}
                   >
                     Proposed change
                   </span>
                   <span
                     style={{
-                      background: "#EEF1FF",
-                      color: "#37458A",
+                      background: "var(--fd-accent-bg)",
+                      color: "var(--fd-accent-text-2)",
                       fontSize: "11.5px",
                       fontWeight: 700,
                       padding: "4px 10px",
@@ -818,7 +818,7 @@ export default function OperatorView({
                     fontWeight: 700,
                     letterSpacing: ".04em",
                     textTransform: "uppercase",
-                    color: "#737685",
+                    color: "var(--fd-faint)",
                     marginTop: 16,
                   }}
                 >
@@ -843,14 +843,14 @@ export default function OperatorView({
                             display: "flex",
                             gap: 10,
                             alignItems: "flex-start",
-                            background: "#FDEFF2",
+                            background: "var(--fd-danger-bg)",
                             borderRadius: 10,
                             padding: "11px 13px",
                           }}
                         >
                           <span
                             style={{
-                              color: "#CF193A",
+                              color: "var(--fd-danger)",
                               fontWeight: 800,
                               fontSize: 14,
                               lineHeight: 1.4,
@@ -861,7 +861,7 @@ export default function OperatorView({
                           <span
                             style={{
                               fontSize: 14,
-                              color: "#9497A6",
+                              color: "var(--fd-dim)",
                               textDecoration: "line-through",
                               lineHeight: 1.4,
                             }}
@@ -875,14 +875,14 @@ export default function OperatorView({
                           display: "flex",
                           gap: 10,
                           alignItems: "flex-start",
-                          background: "#E7F7EE",
+                          background: "var(--fd-green-bg)",
                           borderRadius: 10,
                           padding: "11px 13px",
                         }}
                       >
                         <span
                           style={{
-                            color: "#227A47",
+                            color: "var(--fd-green-text)",
                             fontWeight: 800,
                             fontSize: 14,
                             lineHeight: 1.4,
@@ -893,7 +893,7 @@ export default function OperatorView({
                         <span
                           style={{
                             fontSize: 14,
-                            color: "#18181D",
+                            color: "var(--fd-text)",
                             fontWeight: 600,
                             lineHeight: 1.4,
                           }}
@@ -905,12 +905,12 @@ export default function OperatorView({
                         <div
                           style={{
                             fontSize: "12.5px",
-                            color: "#5C5E6A",
+                            color: "var(--fd-muted)",
                             lineHeight: 1.5,
                             padding: "2px 2px 0",
                           }}
                         >
-                          <span style={{ fontWeight: 700, color: "#737685" }}>
+                          <span style={{ fontWeight: 700, color: "var(--fd-faint)" }}>
                             Parents will see:{" "}
                           </span>
                           {c.body}
@@ -932,8 +932,8 @@ export default function OperatorView({
                     onClick={discardProposal}
                     style={{
                       background: "transparent",
-                      color: "#5C5E6A",
-                      border: "1px solid #EBEFF4",
+                      color: "var(--fd-muted)",
+                      border: "1px solid var(--fd-border)",
                       borderRadius: 11,
                       padding: "10px 18px",
                       fontSize: "13.5px",
@@ -948,8 +948,8 @@ export default function OperatorView({
                     className="fd-primary"
                     onClick={confirmProposal}
                     style={{
-                      background: "#5463D6",
-                      color: "#FFFFFF",
+                      background: "var(--fd-brand)",
+                      color: "var(--fd-on-accent)",
                       border: "none",
                       borderRadius: 11,
                       padding: "10px 18px",
@@ -970,8 +970,8 @@ export default function OperatorView({
               <div
                 style={{
                   marginTop: 18,
-                  background: "#E7F7EE",
-                  border: "1px solid #BFE9CF",
+                  background: "var(--fd-green-bg)",
+                  border: "1px solid var(--fd-green-border)",
                   borderRadius: 16,
                   padding: "16px 18px",
                   display: "flex",
@@ -985,7 +985,7 @@ export default function OperatorView({
                     width: 32,
                     height: 32,
                     borderRadius: 999,
-                    background: "#3BBA6E",
+                    background: "var(--fd-green)",
                     display: "grid",
                     placeItems: "center",
                     flexShrink: 0,
@@ -996,7 +996,7 @@ export default function OperatorView({
                     height="17"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#FFFFFF"
+                    stroke="var(--fd-on-accent)"
                     strokeWidth="2.6"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1009,7 +1009,7 @@ export default function OperatorView({
                     style={{
                       fontSize: "14.5px",
                       fontWeight: 700,
-                      color: "#1A6B3D",
+                      color: "var(--fd-green-text-2)",
                     }}
                   >
                     Published — parents see this now.
@@ -1017,7 +1017,7 @@ export default function OperatorView({
                   <div
                     style={{
                       fontSize: "12.5px",
-                      color: "#3E8259",
+                      color: "var(--fd-green-text-3)",
                       marginTop: 2,
                     }}
                   >
@@ -1045,13 +1045,13 @@ export default function OperatorView({
               style={{
                 fontSize: 24,
                 fontWeight: 800,
-                color: "#18181D",
+                color: "var(--fd-text)",
                 letterSpacing: "-.01em",
               }}
             >
               Changelog
             </div>
-            <div style={{ fontSize: 14, color: "#5C5E6A", marginTop: 4 }}>
+            <div style={{ fontSize: 14, color: "var(--fd-muted)", marginTop: 4 }}>
               Every change to what parents see — who, what, and when.
             </div>
             <div style={{ marginTop: 24 }}>
@@ -1070,7 +1070,7 @@ export default function OperatorView({
                         width: 36,
                         height: 36,
                         borderRadius: 999,
-                        color: "#FFFFFF",
+                        color: "var(--fd-on-accent)",
                         fontSize: 12,
                         fontWeight: 800,
                         display: "grid",
@@ -1084,7 +1084,7 @@ export default function OperatorView({
                       style={{
                         width: 2,
                         flex: 1,
-                        background: "#E4E8F1",
+                        background: "var(--fd-border-3)",
                         marginTop: 6,
                       }}
                     />
@@ -1102,7 +1102,7 @@ export default function OperatorView({
                         style={{
                           fontSize: 14,
                           fontWeight: 700,
-                          color: "#18181D",
+                          color: "var(--fd-text)",
                         }}
                       >
                         {c.who}
@@ -1110,7 +1110,7 @@ export default function OperatorView({
                       <span
                         style={{
                           fontSize: 12,
-                          color: "#737685",
+                          color: "var(--fd-faint)",
                           flexShrink: 0,
                         }}
                       >
@@ -1118,7 +1118,7 @@ export default function OperatorView({
                       </span>
                     </div>
                     <div
-                      style={{ fontSize: 14, color: "#5C5E6A", marginTop: 3 }}
+                      style={{ fontSize: 14, color: "var(--fd-muted)", marginTop: 3 }}
                     >
                       {c.what}
                     </div>
@@ -1134,8 +1134,8 @@ export default function OperatorView({
                       >
                         <span
                           style={{
-                            background: "#F3F4F8",
-                            color: "#9497A6",
+                            background: "var(--fd-sunken-3)",
+                            color: "var(--fd-dim)",
                             textDecoration: "line-through",
                             fontSize: "12.5px",
                             fontWeight: 600,
@@ -1150,7 +1150,7 @@ export default function OperatorView({
                           height="15"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="#C4C8D4"
+                          stroke="var(--fd-dim-4)"
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -1160,8 +1160,8 @@ export default function OperatorView({
                         </svg>
                         <span
                           style={{
-                            background: "#E7F7EE",
-                            color: "#227A47",
+                            background: "var(--fd-green-bg)",
+                            color: "var(--fd-green-text)",
                             fontSize: "12.5px",
                             fontWeight: 700,
                             padding: "5px 11px",
@@ -1182,15 +1182,15 @@ export default function OperatorView({
                               gap: 9,
                             }}
                           >
-                            <span style={{ fontSize: "12.5px", color: "#737685" }}>
+                            <span style={{ fontSize: "12.5px", color: "var(--fd-faint)" }}>
                               Undo this change?
                             </span>
                             <button
                               onClick={() => doRevert(c.id!)}
                               disabled={revertBusyId === c.id}
                               style={{
-                                background: "#5463D6",
-                                color: "#FFFFFF",
+                                background: "var(--fd-brand)",
+                                color: "var(--fd-on-accent)",
                                 border: "none",
                                 borderRadius: 9,
                                 padding: "6px 13px",
@@ -1206,8 +1206,8 @@ export default function OperatorView({
                               disabled={revertBusyId === c.id}
                               style={{
                                 background: "transparent",
-                                color: "#5C5E6A",
-                                border: "1px solid #EBEFF4",
+                                color: "var(--fd-muted)",
+                                border: "1px solid var(--fd-border)",
                                 borderRadius: 9,
                                 padding: "6px 13px",
                                 fontSize: "12.5px",
@@ -1227,8 +1227,8 @@ export default function OperatorView({
                               alignItems: "center",
                               gap: 6,
                               background: "transparent",
-                              color: "#5463D6",
-                              border: "1px solid #E3E8FF",
+                              color: "var(--fd-brand)",
+                              border: "1px solid var(--fd-accent-bg-2)",
                               borderRadius: 9,
                               padding: "6px 12px",
                               fontSize: "12.5px",
@@ -1278,7 +1278,7 @@ export default function OperatorView({
         >
           <div
             style={{
-              background: "#FFFFFF",
+              background: "var(--fd-surface)",
               borderRadius: 22,
               maxWidth: 480,
               width: "100%",
@@ -1286,10 +1286,10 @@ export default function OperatorView({
               padding: "24px 24px 20px",
             }}
           >
-            <div style={{ fontSize: 17, fontWeight: 800, color: "#18181D", letterSpacing: "-.01em" }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "var(--fd-text)", letterSpacing: "-.01em" }}>
               Import this handbook?
             </div>
-            <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 10, lineHeight: 1.5 }}>
+            <div style={{ fontSize: "13.5px", color: "var(--fd-muted)", marginTop: 10, lineHeight: 1.5 }}>
               The AI will read <b>{pendingFile.name}</b> and turn each policy into
               cited entries parents can ask about. This <b>replaces</b> the
               current imported handbook — your curated facts and manual edits are
@@ -1300,8 +1300,8 @@ export default function OperatorView({
                 onClick={cancelImport}
                 style={{
                   background: "transparent",
-                  color: "#5C5E6A",
-                  border: "1px solid #EBEFF4",
+                  color: "var(--fd-muted)",
+                  border: "1px solid var(--fd-border)",
                   borderRadius: 11,
                   padding: "10px 18px",
                   fontSize: "13.5px",
@@ -1314,8 +1314,8 @@ export default function OperatorView({
               <button
                 onClick={confirmImport}
                 style={{
-                  background: "#5463D6",
-                  color: "#FFFFFF",
+                  background: "var(--fd-brand)",
+                  color: "var(--fd-on-accent)",
                   border: "none",
                   borderRadius: 11,
                   padding: "10px 18px",
@@ -1347,7 +1347,7 @@ export default function OperatorView({
         >
           <div
             style={{
-              background: "#FFFFFF",
+              background: "var(--fd-surface)",
               borderRadius: 22,
               maxWidth: 540,
               width: "100%",
@@ -1368,7 +1368,7 @@ export default function OperatorView({
                   width: 40,
                   height: 40,
                   borderRadius: 12,
-                  background: "#FFF1DE",
+                  background: "var(--fd-amber-bg)",
                   display: "grid",
                   placeItems: "center",
                   flexShrink: 0,
@@ -1379,7 +1379,7 @@ export default function OperatorView({
                   height="21"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#E08A0B"
+                  stroke="var(--fd-amber-2)"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -1394,7 +1394,7 @@ export default function OperatorView({
                   style={{
                     fontSize: 17,
                     fontWeight: 800,
-                    color: "#18181D",
+                    color: "var(--fd-text)",
                     letterSpacing: "-.01em",
                   }}
                 >
@@ -1403,7 +1403,7 @@ export default function OperatorView({
                 <div
                   style={{
                     fontSize: "13.5px",
-                    color: "#5C5E6A",
+                    color: "var(--fd-muted)",
                     marginTop: 3,
                     lineHeight: 1.45,
                   }}
@@ -1423,7 +1423,7 @@ export default function OperatorView({
             >
               <div
                 style={{
-                  border: "1px solid #EBEFF4",
+                  border: "1px solid var(--fd-border)",
                   borderRadius: 14,
                   padding: 15,
                 }}
@@ -1434,7 +1434,7 @@ export default function OperatorView({
                     fontWeight: 700,
                     letterSpacing: ".04em",
                     textTransform: "uppercase",
-                    color: "#737685",
+                    color: "var(--fd-faint)",
                   }}
                 >
                   Currently on file
@@ -1443,7 +1443,7 @@ export default function OperatorView({
                   style={{
                     fontSize: 19,
                     fontWeight: 800,
-                    color: "#18181D",
+                    color: "var(--fd-text)",
                     marginTop: 9,
                   }}
                 >
@@ -1452,7 +1452,7 @@ export default function OperatorView({
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#737685",
+                    color: "var(--fd-faint)",
                     marginTop: 8,
                     lineHeight: 1.4,
                   }}
@@ -1464,8 +1464,8 @@ export default function OperatorView({
               </div>
               <div
                 style={{
-                  border: "1.5px solid #B1BAFF",
-                  background: "#F5F7FF",
+                  border: "1.5px solid var(--fd-focus)",
+                  background: "var(--fd-accent-bg-4)",
                   borderRadius: 14,
                   padding: 15,
                 }}
@@ -1476,7 +1476,7 @@ export default function OperatorView({
                     fontWeight: 700,
                     letterSpacing: ".04em",
                     textTransform: "uppercase",
-                    color: "#5463D6",
+                    color: "var(--fd-brand)",
                   }}
                 >
                   Your update
@@ -1485,7 +1485,7 @@ export default function OperatorView({
                   style={{
                     fontSize: 19,
                     fontWeight: 800,
-                    color: "#37458A",
+                    color: "var(--fd-accent-text-2)",
                     marginTop: 9,
                   }}
                 >
@@ -1494,7 +1494,7 @@ export default function OperatorView({
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#737685",
+                    color: "var(--fd-faint)",
                     marginTop: 8,
                     lineHeight: 1.4,
                   }}
@@ -1512,7 +1512,7 @@ export default function OperatorView({
                 gap: 10,
                 padding: "20px 24px",
                 marginTop: 18,
-                borderTop: "1px solid #EBEFF4",
+                borderTop: "1px solid var(--fd-border)",
               }}
             >
               <button
@@ -1520,8 +1520,8 @@ export default function OperatorView({
                 onClick={resolveCurrent}
                 style={{
                   background: "transparent",
-                  color: "#5C5E6A",
-                  border: "1px solid #EBEFF4",
+                  color: "var(--fd-muted)",
+                  border: "1px solid var(--fd-border)",
                   borderRadius: 11,
                   padding: "11px 18px",
                   fontSize: "13.5px",
@@ -1536,8 +1536,8 @@ export default function OperatorView({
                 className="fd-primary"
                 onClick={resolveNew}
                 style={{
-                  background: "#5463D6",
-                  color: "#FFFFFF",
+                  background: "var(--fd-brand)",
+                  color: "var(--fd-on-accent)",
                   border: "none",
                   borderRadius: 11,
                   padding: "11px 18px",

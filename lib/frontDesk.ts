@@ -291,9 +291,9 @@ export const originStyles: Record<
   EntityOrigin,
   { bg: string; color: string; label: string }
 > = {
-  seed: { bg: "#EEF1FF", color: "#4B57B8", label: "Curated" },
-  authored: { bg: "#E7F7EE", color: "#227A47", label: "Operator" },
-  handbook: { bg: "#FFF1DE", color: "#B5710A", label: "Handbook" },
+  seed: { bg: "var(--fd-accent-bg)", color: "var(--fd-accent-text)", label: "Curated" },
+  authored: { bg: "var(--fd-green-bg)", color: "var(--fd-green-text)", label: "Operator" },
+  handbook: { bg: "var(--fd-amber-bg)", color: "var(--fd-amber-text)", label: "Handbook" },
 };
 
 export async function fetchEntities(): Promise<KbEntityDetail[]> {
@@ -390,10 +390,10 @@ export const statusStyles: Record<
   InboxStatus,
   { bg: string; color: string; label: string }
 > = {
-  answered: { bg: "#E7F7EE", color: "#227A47", label: "Answered" },
-  escalated: { bg: "#FFF1DE", color: "#B5710A", label: "Escalated" },
-  lowconf: { bg: "#FFF7DB", color: "#9A7B12", label: "Low confidence" },
-  resolved: { bg: "#EEF1FF", color: "#4B57B8", label: "Resolved" },
+  answered: { bg: "var(--fd-green-bg)", color: "var(--fd-green-text)", label: "Answered" },
+  escalated: { bg: "var(--fd-amber-bg)", color: "var(--fd-amber-text)", label: "Escalated" },
+  lowconf: { bg: "var(--fd-yellow-bg)", color: "var(--fd-yellow-text-2)", label: "Low confidence" },
+  resolved: { bg: "var(--fd-accent-bg)", color: "var(--fd-accent-text)", label: "Resolved" },
 };
 
 export async function fetchInbox(): Promise<InboxItem[]> {
@@ -475,7 +475,7 @@ export const changelog: ChangelogEntry[] = [
     after: "Turkey & cheese, apple slices, milk",
     isDiff: true,
     initials: "MC",
-    color: "#5463D6",
+    color: "var(--fd-brand)",
   },
   {
     who: "AI Front Desk",
@@ -483,7 +483,7 @@ export const changelog: ChangelogEntry[] = [
     what: "Escalated a fever question to the Toddler Room staff",
     isDiff: false,
     initials: "AI",
-    color: "#29B9BB",
+    color: "var(--fd-teal)",
   },
   {
     who: "Auto-sync",
@@ -493,7 +493,7 @@ export const changelog: ChangelogEntry[] = [
     after: "$1,600 / mo",
     isDiff: true,
     initials: "SY",
-    color: "#737685",
+    color: "var(--fd-faint)",
   },
   {
     who: "Maria Chen",
@@ -501,6 +501,6 @@ export const changelog: ChangelogEntry[] = [
     what: "Confirmed illness policy — fever 100.4°F, stay home 24 h fever-free",
     isDiff: false,
     initials: "MC",
-    color: "#5463D6",
+    color: "var(--fd-brand)",
   },
 ];

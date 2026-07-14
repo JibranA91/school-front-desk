@@ -12,8 +12,8 @@ export default async function Home() {
       className="fd-page"
       style={{
         minHeight: "100vh",
-        background: "#F7F9FB",
-        color: "#18181D",
+        background: "var(--fd-bg)",
+        color: "var(--fd-text)",
         padding: "74px 20px 40px",
         position: "relative",
       }}

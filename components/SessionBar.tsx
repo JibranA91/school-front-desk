@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function SessionBar({ name }: { name: string }) {
   return (
@@ -20,17 +21,18 @@ export default function SessionBar({ name }: { name: string }) {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 8,
           padding: "6px 8px 6px 14px",
-          background: "#FFFFFF",
-          border: "1px solid #EBEFF4",
+          background: "var(--fd-surface)",
+          border: "1px solid var(--fd-border)",
           borderRadius: 999,
           boxShadow: "0 6px 22px rgba(24,24,29,.08)",
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#18181D" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fd-text)" }}>
           {name}
         </span>
+        <ThemeToggle />
         <button
           onClick={async () => {
             // End the chat session so the next login starts fresh (a refresh,
@@ -48,9 +50,9 @@ export default function SessionBar({ name }: { name: string }) {
           }}
           className="fd-ghost"
           style={{
-            border: "1px solid #EBEFF4",
+            border: "1px solid var(--fd-border)",
             background: "transparent",
-            color: "#5C5E6A",
+            color: "var(--fd-muted)",
             borderRadius: 999,
             padding: "6px 14px",
             fontSize: 13,

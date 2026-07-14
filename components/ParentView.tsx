@@ -151,8 +151,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
           width: 390,
           maxWidth: "100%",
           height: 824,
-          background: "#FFFFFF",
-          border: "1px solid #EBEFF4",
+          background: "var(--fd-surface)",
+          border: "1px solid var(--fd-border)",
           borderRadius: 44,
           boxShadow: "0 30px 70px -20px rgba(30,37,73,.28)",
           overflow: "hidden",
@@ -163,7 +163,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
         {/* Header */}
         <div
           style={{
-            background: "#5463D6",
+            background: "var(--fd-brand)",
             padding: "18px 18px 16px",
             display: "flex",
             alignItems: "center",
@@ -175,7 +175,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
               width: 44,
               height: 44,
               borderRadius: 14,
-              background: "#FFFFFF",
+              background: "var(--fd-surface)",
               display: "grid",
               placeItems: "center",
               flexShrink: 0,
@@ -187,7 +187,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
               height="24"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#29B9BB"
+              stroke="var(--fd-teal)"
               strokeWidth="2.2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -199,7 +199,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                color: "#FFFFFF",
+                color: "var(--fd-on-accent)",
                 fontSize: "15.5px",
                 fontWeight: 700,
                 lineHeight: 1.2,
@@ -209,7 +209,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
             </div>
             <div
               style={{
-                color: "#C9CFFF",
+                color: "var(--fd-accent-strong-bg)",
                 fontSize: 12,
                 fontWeight: 500,
                 marginTop: 2,
@@ -223,7 +223,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   width: 7,
                   height: 7,
                   borderRadius: 999,
-                  background: "#3BBA6E",
+                  background: "var(--fd-green)",
                   display: "inline-block",
                 }}
               />
@@ -238,8 +238,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
             display: "flex",
             gap: 6,
             padding: "8px 12px",
-            borderBottom: "1px solid #EBEFF4",
-            background: "#FFFFFF",
+            borderBottom: "1px solid var(--fd-border)",
+            background: "var(--fd-surface)",
           }}
         >
           {(
@@ -265,8 +265,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   cursor: "pointer",
                   fontSize: 14,
                   fontWeight: 700,
-                  background: active ? "#EEF1FF" : "transparent",
-                  color: active ? "#37458A" : "#737685",
+                  background: active ? "var(--fd-accent-bg)" : "transparent",
+                  color: active ? "var(--fd-accent-text-2)" : "var(--fd-faint)",
                   transition: "all .15s",
                 }}
               >
@@ -274,8 +274,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                 {key === "updates" && unseen > 0 && (
                   <span
                     style={{
-                      background: "#FF5A5F",
-                      color: "#FFFFFF",
+                      background: "var(--fd-notify)",
+                      color: "var(--fd-on-accent)",
                       fontSize: 11,
                       fontWeight: 800,
                       minWidth: 18,
@@ -302,7 +302,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
         <div
           ref={scrollRef}
           className="fd-scroll"
-          style={{ flex: 1, overflowY: "auto", background: "#FBFCFE" }}
+          style={{ flex: 1, overflowY: "auto", background: "var(--fd-surface-2)" }}
         >
           <div
             className="fd-chat-col"
@@ -317,8 +317,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
             style={{
               alignSelf: "flex-start",
               maxWidth: "86%",
-              background: "#F1F4FF",
-              color: "#18181D",
+              background: "var(--fd-accent-bg-3)",
+              color: "var(--fd-text)",
               fontSize: "14.5px",
               lineHeight: 1.5,
               padding: "13px 15px",
@@ -346,9 +346,9 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                 style={{
                   padding: "10px 15px",
                   borderRadius: 999,
-                  border: "1.5px solid #DCE1FF",
-                  background: "#FFFFFF",
-                  color: "#5463D6",
+                  border: "1.5px solid var(--fd-accent-border)",
+                  background: "var(--fd-surface)",
+                  color: "var(--fd-brand)",
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: "pointer",
@@ -368,8 +368,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   style={{
                     alignSelf: "flex-end",
                     maxWidth: "82%",
-                    background: "#5463D6",
-                    color: "#FFFFFF",
+                    background: "var(--fd-brand)",
+                    color: "var(--fd-on-accent)",
                     fontSize: "14.5px",
                     lineHeight: 1.45,
                     padding: "12px 16px",
@@ -389,8 +389,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   style={{
                     alignSelf: "flex-start",
                     maxWidth: "86%",
-                    background: "#F1F4FF",
-                    color: "#18181D",
+                    background: "var(--fd-accent-bg-3)",
+                    color: "var(--fd-text)",
                     fontSize: "14.5px",
                     lineHeight: 1.5,
                     padding: "13px 15px",
@@ -410,8 +410,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   style={{
                     alignSelf: "flex-start",
                     width: "92%",
-                    background: "#FFFFFF",
-                    border: "1px solid #DDE7FF",
+                    background: "var(--fd-surface)",
+                    border: "1px solid var(--fd-accent-border-2)",
                     borderRadius: 20,
                     boxShadow: "0 10px 26px -14px rgba(84,99,214,.3)",
                     padding: 16,
@@ -424,8 +424,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                         width: 34,
                         height: 34,
                         borderRadius: 999,
-                        background: "#29B9BB",
-                        color: "#062B2B",
+                        background: "var(--fd-teal)",
+                        color: "var(--fd-on-teal)",
                         fontSize: 12,
                         fontWeight: 800,
                         display: "grid",
@@ -441,17 +441,17 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                         .toUpperCase()}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#18181D" }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--fd-text)" }}>
                         {m.by ?? "Sunnyside staff"}
                       </div>
-                      <div style={{ fontSize: 11.5, color: "#737685" }}>
+                      <div style={{ fontSize: 11.5, color: "var(--fd-faint)" }}>
                         Sunnyside staff
                       </div>
                     </div>
                     <span
                       style={{
-                        background: "#EEF1FF",
-                        color: "#4B57B8",
+                        background: "var(--fd-accent-bg)",
+                        color: "var(--fd-accent-text)",
                         padding: "4px 10px",
                         borderRadius: 999,
                         fontSize: 11,
@@ -466,7 +466,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       marginTop: 11,
                       fontSize: "14.5px",
                       lineHeight: 1.55,
-                      color: "#18181D",
+                      color: "var(--fd-text)",
                       whiteSpace: "pre-wrap",
                     }}
                   >
@@ -484,8 +484,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   style={{
                     alignSelf: "flex-start",
                     width: "92%",
-                    background: "#FFFFFF",
-                    border: "1px solid #EBEFF4",
+                    background: "var(--fd-surface)",
+                    border: "1px solid var(--fd-border)",
                     borderRadius: 20,
                     boxShadow: "0 10px 26px -12px rgba(30,37,73,.18)",
                     padding: 16,
@@ -493,7 +493,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   }}
                 >
                   <div
-                    style={{ fontSize: 15, lineHeight: 1.55, color: "#18181D" }}
+                    style={{ fontSize: 15, lineHeight: 1.55, color: "var(--fd-text)" }}
                   >
                     {m.answer}
                   </div>
@@ -503,8 +503,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       alignItems: "center",
                       gap: 6,
                       marginTop: 13,
-                      background: "#E7F7EE",
-                      color: "#227A47",
+                      background: "var(--fd-green-bg)",
+                      color: "var(--fd-green-text)",
                       padding: "5px 11px",
                       borderRadius: 999,
                       fontSize: 12,
@@ -516,7 +516,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#3BBA6E"
+                      stroke="var(--fd-green)"
                       strokeWidth="2.4"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -535,9 +535,9 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       gap: 9,
                       width: "100%",
                       marginTop: 11,
-                      background: "#F5F7FF",
-                      border: "1px solid #E3E8FF",
-                      color: "#5463D6",
+                      background: "var(--fd-accent-bg-4)",
+                      border: "1px solid var(--fd-accent-bg-2)",
+                      color: "var(--fd-brand)",
                       padding: "10px 12px",
                       borderRadius: 12,
                       fontSize: "12.5px",
@@ -580,12 +580,12 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       style={{
                         marginTop: 9,
                         padding: "11px 13px",
-                        background: "#FBFCFE",
-                        border: "1px dashed #DCE1FF",
+                        background: "var(--fd-surface-2)",
+                        border: "1px dashed var(--fd-accent-border)",
                         borderRadius: 12,
                         fontSize: "12.5px",
                         lineHeight: 1.5,
-                        color: "#5C5E6A",
+                        color: "var(--fd-muted)",
                       }}
                     >
                       {m.source}
@@ -602,8 +602,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   style={{
                     alignSelf: "flex-start",
                     width: "92%",
-                    background: "#FFF6EB",
-                    border: "1px solid #FFE1BB",
+                    background: "var(--fd-amber-bg-3)",
+                    border: "1px solid var(--fd-amber-border)",
                     borderRadius: 20,
                     boxShadow: "0 10px 26px -14px rgba(255,157,23,.35)",
                     padding: 16,
@@ -618,7 +618,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                         width: 36,
                         height: 36,
                         borderRadius: 12,
-                        background: "#FF9D17",
+                        background: "var(--fd-amber)",
                         display: "grid",
                         placeItems: "center",
                         flexShrink: 0,
@@ -629,7 +629,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                         height="19"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#FFFFFF"
+                        stroke="var(--fd-on-accent)"
                         strokeWidth="2.2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -641,7 +641,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       style={{
                         fontSize: "14.5px",
                         fontWeight: 700,
-                        color: "#9A5A00",
+                        color: "var(--fd-amber-text-3)",
                         lineHeight: 1.25,
                       }}
                     >
@@ -652,7 +652,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                     style={{
                       fontSize: "14.5px",
                       lineHeight: 1.55,
-                      color: "#5C5E6A",
+                      color: "var(--fd-muted)",
                       marginTop: 12,
                     }}
                   >
@@ -664,8 +664,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       alignItems: "center",
                       gap: 9,
                       marginTop: 13,
-                      background: "#FFFFFF",
-                      border: "1px solid #FFE1BB",
+                      background: "var(--fd-surface)",
+                      border: "1px solid var(--fd-amber-border)",
                       borderRadius: 12,
                       padding: "10px 12px",
                     }}
@@ -675,7 +675,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       height="15"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#C77B0E"
+                      stroke="var(--fd-amber-text-2)"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -688,7 +688,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       style={{
                         fontSize: "12.5px",
                         fontWeight: 600,
-                        color: "#9A5A00",
+                        color: "var(--fd-amber-text-3)",
                       }}
                     >
                       A teacher will follow up with you as soon as they can.
@@ -706,8 +706,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                   style={{
                     alignSelf: "flex-start",
                     width: "92%",
-                    background: "#FFFFFF",
-                    border: "1px solid #EBEFF4",
+                    background: "var(--fd-surface)",
+                    border: "1px solid var(--fd-border)",
                     borderRadius: 20,
                     boxShadow: "0 10px 26px -12px rgba(30,37,73,.18)",
                     padding: 16,
@@ -722,7 +722,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                         width: 36,
                         height: 36,
                         borderRadius: 12,
-                        background: "#E4F7F7",
+                        background: "var(--fd-teal-bg)",
                         display: "grid",
                         placeItems: "center",
                         flexShrink: 0,
@@ -733,7 +733,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                         height="18"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#20A0A2"
+                        stroke="var(--fd-teal-text-2)"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -748,15 +748,15 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                         flex: 1,
                         fontSize: "14.5px",
                         fontWeight: 700,
-                        color: "#18181D",
+                        color: "var(--fd-text)",
                       }}
                     >
                       Today&apos;s lunch
                     </div>
                     <span
                       style={{
-                        background: "#E4F7F7",
-                        color: "#12878A",
+                        background: "var(--fd-teal-bg)",
+                        color: "var(--fd-teal-text)",
                         padding: "4px 10px",
                         borderRadius: 999,
                         fontSize: 11,
@@ -770,7 +770,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                     style={{
                       fontSize: "14.5px",
                       lineHeight: 1.55,
-                      color: "#5C5E6A",
+                      color: "var(--fd-muted)",
                       marginTop: 12,
                     }}
                   >
@@ -792,7 +792,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                           alignItems: "center",
                           gap: 11,
                           fontSize: "14.5px",
-                          color: "#18181D",
+                          color: "var(--fd-text)",
                           fontWeight: 600,
                         }}
                       >
@@ -801,7 +801,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                             width: 7,
                             height: 7,
                             borderRadius: 999,
-                            background: "#29B9BB",
+                            background: "var(--fd-teal)",
                             flexShrink: 0,
                           }}
                         />
@@ -818,9 +818,9 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       gap: 9,
                       width: "100%",
                       marginTop: 13,
-                      background: "#F5F7FF",
-                      border: "1px solid #E3E8FF",
-                      color: "#5463D6",
+                      background: "var(--fd-accent-bg-4)",
+                      border: "1px solid var(--fd-accent-bg-2)",
+                      color: "var(--fd-brand)",
                       padding: "10px 12px",
                       borderRadius: 12,
                       fontSize: "12.5px",
@@ -863,12 +863,12 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       style={{
                         marginTop: 9,
                         padding: "11px 13px",
-                        background: "#FBFCFE",
-                        border: "1px dashed #DCE1FF",
+                        background: "var(--fd-surface-2)",
+                        border: "1px dashed var(--fd-accent-border)",
                         borderRadius: 12,
                         fontSize: "12.5px",
                         lineHeight: 1.5,
-                        color: "#5C5E6A",
+                        color: "var(--fd-muted)",
                       }}
                     >
                       {m.source}
@@ -885,7 +885,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
             <div
               style={{
                 alignSelf: "flex-start",
-                background: "#F1F4FF",
+                background: "var(--fd-accent-bg-3)",
                 padding: "13px 16px",
                 borderRadius: "18px 18px 18px 6px",
                 display: "flex",
@@ -902,7 +902,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                       width: 7,
                       height: 7,
                       borderRadius: 999,
-                      background: "#8B93C9",
+                      background: "var(--fd-accent-dim-2)",
                       animation: `fdBlink 1.2s infinite ${d}s`,
                     }}
                   />
@@ -926,8 +926,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
         <div
           style={{
             padding: "12px 14px",
-            borderTop: "1px solid #EBEFF4",
-            background: "#FFFFFF",
+            borderTop: "1px solid var(--fd-border)",
+            background: "var(--fd-surface)",
             display: "flex",
             justifyContent: "center",
           }}
@@ -941,8 +941,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
               flex: 1,
               display: "flex",
               alignItems: "center",
-              background: "#F7F9FB",
-              border: "1px solid #EBEFF4",
+              background: "var(--fd-bg)",
+              border: "1px solid var(--fd-border)",
               borderRadius: 999,
               padding: "0 16px",
             }}
@@ -962,7 +962,7 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
                 border: "none",
                 background: "transparent",
                 fontSize: "14.5px",
-                color: "#18181D",
+                color: "var(--fd-text)",
                 padding: "13px 0",
                 outline: "none",
               }}
@@ -976,8 +976,8 @@ export default function ParentView({ userKey = "" }: { userKey?: string }) {
               height: 46,
               borderRadius: 999,
               border: "none",
-              background: "#5463D6",
-              color: "#FFFFFF",
+              background: "var(--fd-brand)",
+              color: "var(--fd-on-accent)",
               display: "grid",
               placeItems: "center",
               cursor: "pointer",
@@ -1024,7 +1024,7 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
           gap: 10,
           padding: "40px 28px",
           textAlign: "center",
-          background: "#FBFCFE",
+          background: "var(--fd-surface-2)",
         }}
       >
         <div
@@ -1032,7 +1032,7 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
             width: 52,
             height: 52,
             borderRadius: 16,
-            background: "#EEF1FF",
+            background: "var(--fd-accent-bg)",
             display: "grid",
             placeItems: "center",
           }}
@@ -1042,7 +1042,7 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
             height="26"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#5463D6"
+            stroke="var(--fd-brand)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -1051,10 +1051,10 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
             <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
           </svg>
         </div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--fd-text)" }}>
           No updates yet
         </div>
-        <div style={{ fontSize: "13.5px", color: "#737685", lineHeight: 1.5, maxWidth: 280 }}>
+        <div style={{ fontSize: "13.5px", color: "var(--fd-faint)", lineHeight: 1.5, maxWidth: 280 }}>
           When you ask something our staff needs to handle personally, their reply
           will show up here — even if you&apos;ve closed the app.
         </div>
@@ -1065,7 +1065,7 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
   return (
     <div
       className="fd-scroll"
-      style={{ flex: 1, overflowY: "auto", background: "#FBFCFE" }}
+      style={{ flex: 1, overflowY: "auto", background: "var(--fd-surface-2)" }}
     >
       <div
         className="fd-chat-col"
@@ -1082,8 +1082,8 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
           <div
             key={u.id}
             style={{
-              background: "#FFFFFF",
-              border: `1px solid ${answered ? "#DDE7FF" : "#FFE1BB"}`,
+              background: "var(--fd-surface)",
+              border: `1px solid ${answered ? "var(--fd-accent-border-2)" : "var(--fd-amber-border)"}`,
               borderRadius: 18,
               padding: 16,
               boxShadow: "0 8px 22px -16px rgba(30,37,73,.25)",
@@ -1102,8 +1102,8 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  background: answered ? "#E7F7EE" : "#FFF6EB",
-                  color: answered ? "#227A47" : "#9A5A00",
+                  background: answered ? "var(--fd-green-bg)" : "var(--fd-amber-bg-3)",
+                  color: answered ? "var(--fd-green-text)" : "var(--fd-amber-text-3)",
                   fontSize: 11.5,
                   fontWeight: 700,
                   padding: "4px 10px",
@@ -1115,7 +1115,7 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
                     width: 7,
                     height: 7,
                     borderRadius: 999,
-                    background: answered ? "#3BBA6E" : "#FF9D17",
+                    background: answered ? "var(--fd-green)" : "var(--fd-amber)",
                     display: "inline-block",
                   }}
                 />
@@ -1124,8 +1124,8 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
               {u.unseen && (
                 <span
                   style={{
-                    background: "#FF5A5F",
-                    color: "#FFFFFF",
+                    background: "var(--fd-notify)",
+                    color: "var(--fd-on-accent)",
                     fontSize: 10.5,
                     fontWeight: 800,
                     padding: "2px 8px",
@@ -1139,11 +1139,11 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
             <div
               style={{
                 fontSize: "13.5px",
-                color: "#5C5E6A",
+                color: "var(--fd-muted)",
                 lineHeight: 1.45,
               }}
             >
-              <span style={{ fontWeight: 700, color: "#737685" }}>You asked: </span>
+              <span style={{ fontWeight: 700, color: "var(--fd-faint)" }}>You asked: </span>
               {u.question}
             </div>
             {answered && (
@@ -1151,9 +1151,9 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
                 style={{
                   marginTop: 12,
                   paddingTop: 12,
-                  borderTop: "1px solid #F0F2F7",
+                  borderTop: "1px solid var(--fd-sunken)",
                   fontSize: "14.5px",
-                  color: "#18181D",
+                  color: "var(--fd-text)",
                   lineHeight: 1.55,
                   whiteSpace: "pre-wrap",
                 }}
@@ -1166,7 +1166,7 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
                 style={{
                   marginTop: 10,
                   fontSize: "12.5px",
-                  color: "#9A5A00",
+                  color: "var(--fd-amber-text-3)",
                 }}
               >
                 A teacher will follow up as soon as they can.

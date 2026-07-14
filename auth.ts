@@ -39,6 +39,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: u.name,
             role: u.role,
             title: u.title ?? null,
+            theme: u.theme ?? "light",
           };
         } catch {
           return null;
@@ -47,10 +48,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = user.role;
         token.title = user.title ?? null;
+        token.theme = user.theme ?? "light";
+      }
+      // Live preference change from the client via useSession().update({ theme }).
+      if (trigger === "update" && session?.theme) {
+        token.theme = session.theme;
       }
       return token;
     },
@@ -59,6 +65,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (token.sub) session.user.id = token.sub;
         session.user.role = token.role as string | undefined;
         session.user.title = (token.title as string | null | undefined) ?? null;
+        session.user.theme = (token.theme as string | undefined) ?? "light";
       }
       return session;
     },

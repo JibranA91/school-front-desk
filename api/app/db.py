@@ -55,3 +55,6 @@ def init_db() -> None:
         conn.execute(
             text("ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS session_id VARCHAR(64)")
         )
+        conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(10) DEFAULT 'light'")
+        )

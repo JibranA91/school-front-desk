@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { auth } from "@/auth";
+import Providers from "@/components/Providers";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -21,14 +23,27 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the signed-in user's saved preference from the session (JWT — no DB
+  // hit) and stamp it on <html> during SSR, so the first paint is already in
+  // the right theme (no flash). The toggle updates this attribute live.
+  const session = await auth();
+  const theme = session?.user?.theme === "dark" ? "dark" : "light";
+
   return (
-    <html lang="en" className={jakarta.variable}>
-      <body>{children}</body>
+    <html
+      lang="en"
+      data-theme={theme}
+      style={{ colorScheme: theme }}
+      className={jakarta.variable}
+    >
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
