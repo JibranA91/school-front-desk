@@ -106,37 +106,56 @@ button:focus-visible {
    at the breakpoint — same pattern as the hover states below.
 --------------------------------------------------------------------------- */
 @media (max-width: 720px) {
+  /* Full-screen app: no page chrome around the views. */
   .fd-page {
-    padding: 56px 10px 12px !important;
+    padding: 0 !important;
+    min-height: 100dvh !important;
+    background: #ffffff !important;
   }
+  /* Sign-out floats over the app header as a compact pill (name hidden), so it
+     doesn't reserve a top gap. */
   .fd-sessionbar {
-    top: 10px !important;
-    right: 10px !important;
+    top: 8px !important;
+    right: 8px !important;
+    z-index: 60 !important;
+  }
+  .fd-sessionbar span {
+    display: none !important;
+  }
+  .fd-sessionbar > div {
+    padding: 4px !important;
+    gap: 0 !important;
+  }
+  .fd-sessionbar button {
+    padding: 8px !important;
   }
 
-  /* Parent chat fills the screen instead of a fixed phone-mockup card. */
+  /* Parent chat = edge-to-edge full screen (no card border/radius/shadow). */
   .fd-parent-card {
     width: 100% !important;
-    height: calc(100vh - 66px) !important;
-    height: calc(100dvh - 66px) !important;
-    border-radius: 18px !important;
-    box-shadow: 0 8px 24px -16px rgba(30, 37, 73, 0.25) !important;
+    max-width: none !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
 
-  /* Operator: the dark side rail becomes a compact top tab bar. */
+  /* Operator = full screen; the dark side rail becomes a top tab bar. */
   .fd-op-shell {
     flex-direction: column !important;
     width: 100% !important;
-    height: calc(100vh - 66px) !important;
-    height: calc(100dvh - 66px) !important;
+    height: 100vh !important;
+    height: 100dvh !important;
     min-height: 0 !important;
-    border-radius: 16px !important;
+    border: none !important;
+    border-radius: 0 !important;
   }
   .fd-op-sidebar {
     width: 100% !important;
     flex-direction: row !important;
     align-items: center !important;
-    padding: 8px !important;
+    padding: 8px 50px 8px 8px !important; /* right room for the sign-out icon */
   }
   .fd-op-logo,
   .fd-op-profile {
@@ -149,13 +168,17 @@ button:focus-visible {
   }
   .fd-op-nav > button {
     flex: 1 1 0 !important;
+    min-width: 0 !important; /* allow shrinking below text width so all 3 fit */
     justify-content: center !important;
-    padding: 9px 6px !important;
-    font-size: 12.5px !important;
+    gap: 5px !important;
+    padding: 9px 4px !important;
+    font-size: 12px !important;
     white-space: nowrap !important;
   }
   .fd-op-nav > button > span {
     flex: 0 1 auto !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   /* Trim the desktop 30px/34px section padding on phones. */
