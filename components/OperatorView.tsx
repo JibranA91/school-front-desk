@@ -725,20 +725,39 @@ export default function OperatorView({
                 <button
                   className="fd-primary"
                   onClick={propose}
+                  disabled={busy}
                   style={{
-                    background: "#5463D6",
+                    background: busy ? "#9AA3E6" : "#5463D6",
                     color: "#FFFFFF",
                     border: "none",
                     borderRadius: 12,
                     padding: "11px 20px",
                     fontSize: 14,
                     fontWeight: 700,
-                    cursor: "pointer",
+                    cursor: busy ? "default" : "pointer",
                     transition: "background .15s",
                     flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 9,
                   }}
                 >
-                  Propose update
+                  {busy && proposalState === "idle" && (
+                    <span
+                      style={{
+                        width: 15,
+                        height: 15,
+                        borderRadius: 999,
+                        border: "2px solid rgba(255,255,255,.4)",
+                        borderTopColor: "#FFFFFF",
+                        display: "inline-block",
+                        animation: "fdSpin .7s linear infinite",
+                      }}
+                    />
+                  )}
+                  {busy && proposalState === "idle"
+                    ? "Proposing…"
+                    : "Propose update"}
                 </button>
               </div>
             </div>
