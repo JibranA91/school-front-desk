@@ -10,8 +10,9 @@ Design choices:
 - Ingested nodes get an `hb-` id prefix and never overwrite existing entities,
   so the curated demo center stays intact ("uploading your handbook" adds a
   fresh collection rather than merging).
-- Bedrock present  -> Sonnet reads each chunk and writes clean, quotable facts.
-  Mock (no creds)  -> a deterministic heuristic splits sections into entities so
+- LLM available (Bedrock or Anthropic) -> the chat model reads each chunk and
+  writes clean, quotable facts.
+  No LLM (mock)    -> a deterministic heuristic splits sections into entities so
   the pipeline still runs and is demoable offline.
 
 Run against the bundled handbook (DB up):
@@ -143,7 +144,9 @@ _EXTRACT_SYSTEM = (
 )
 
 
-def _extract_bedrock(chunk: Chunk) -> list[Extracted]:
+def _extract_llm(chunk: Chunk) -> list[Extracted]:
+    # Works for any real chat model — get_chat_model resolves the active provider
+    # (Bedrock or Anthropic) and remaps the model id, so this drives both.
     from pydantic import BaseModel, Field
 
     from app.llm import get_chat_model
@@ -396,7 +399,9 @@ def ingest_pdf(
         pages = pages[:max_pages]
     chunks = chunk_pages(pages)
 
-    extract = _extract_bedrock if settings.bedrock_enabled else _extract_heuristic
+    # Use the LLM extractor whenever a real chat model is available (Bedrock OR
+    # Anthropic); fall back to the offline heuristic only in mock mode.
+    extract = _extract_llm if settings.llm_enabled else _extract_heuristic
     raw: list[Extracted] = []
     for i, ch in enumerate(chunks):
         try:
@@ -464,7 +469,7 @@ def ingest_pdf(
         by_type[e.type] = by_type.get(e.type, 0) + 1
     return {
         "source": source_label,
-        "mode": "bedrock" if settings.bedrock_enabled else "heuristic",
+        "mode": settings.provider if settings.llm_enabled else "heuristic",
         "pages": len(pages),
         "chunks": len(chunks),
         "created": len(created),
