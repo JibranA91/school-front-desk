@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,8 +19,15 @@ def _default_creds_available() -> bool:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Database
+    # Database. Managed Postgres providers (Railway, Heroku, …) hand out a URL
+    # like `postgres://…` or `postgresql://…`; the validator below rewrites it to
+    # the `postgresql+psycopg://` driver form SQLAlchemy needs here.
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/frontdesk"
+
+    # Optional first-boot seeding for hosted deploys (e.g. Railway): "" = off
+    # (default), "demo" = full demo, "fresh" = scaffold only (empty KG + inbox).
+    # Runs ONLY when the database has no users yet, so it never wipes live data.
+    seed_on_start: str = ""
 
     # Auth — shared secret the `web` service uses to authenticate to this API.
     auth_shared_secret: str = "dev-shared-secret-change-me"
@@ -78,6 +86,18 @@ class Settings(BaseSettings):
     retrieval_expand_top: int = 3     # how many top hits to expand from
     retrieval_hops: int = 1           # relationship hops to walk
     retrieval_max_entities: int = 25  # safety cap on total injected entities
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalize_database_url(cls, v: str) -> str:
+        """Accept the `postgres://` / `postgresql://` URLs managed providers give
+        and rewrite them to the `postgresql+psycopg://` driver form. No-op for a
+        URL that already names a driver (e.g. `postgresql+psycopg://`)."""
+        if v.startswith("postgres://"):
+            v = "postgresql://" + v[len("postgres://"):]
+        if v.startswith("postgresql://"):
+            v = "postgresql+psycopg://" + v[len("postgresql://"):]
+        return v
 
     @property
     def provider(self) -> str:

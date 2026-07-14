@@ -21,6 +21,28 @@ from app import agent, authoring, ingest, models, retrieval
 from app.routers import auth as auth_router
 
 
+def _maybe_seed_on_start() -> None:
+    """First-boot convenience for hosted deploys (e.g. Railway). When
+    SEED_ON_START is "demo" or "fresh" AND the database has no users yet, load
+    the seed data. The empty-DB guard means an existing dataset is never
+    overwritten, so it's safe to leave enabled across redeploys."""
+    mode = (settings.seed_on_start or "").lower()
+    if mode not in ("demo", "fresh"):
+        return
+    try:
+        from app import seed as seed_mod
+
+        with SessionLocal() as db:
+            has_users = db.scalar(select(models.User).limit(1)) is not None
+        if has_users:
+            print("[startup] seed_on_start: users already present — skipping.")
+            return
+        print(f"[startup] seed_on_start={mode}: empty database, seeding…")
+        seed_mod.seed(fresh=(mode == "fresh"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] seed_on_start skipped: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Best-effort: create the extension + tables on boot. If the DB isn't up
@@ -29,6 +51,7 @@ async def lifespan(app: FastAPI):
         init_db()
     except Exception as exc:  # noqa: BLE001
         print(f"[startup] init_db skipped: {exc}")
+    _maybe_seed_on_start()
     yield
 
 

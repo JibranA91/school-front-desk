@@ -132,6 +132,13 @@ phone on the same network, set `AUTH_URL` to this machine's LAN URL before start
 AUTH_URL=http://<your-lan-ip>:3000 docker compose up -d web
 ```
 
+## Deploy
+
+The repo is prepared for **Railway** (three services: public web, private api,
+private Postgres+pgvector — dynamic `$PORT`, IPv6 private networking, managed
+`DATABASE_URL`, optional first-boot seeding). Step-by-step in
+[`DEPLOY.md`](DEPLOY.md).
+
 ## Evals
 
 Two offline golden-set harnesses score the parent agent against the seeded graph + ingested
