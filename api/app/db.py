@@ -46,3 +46,6 @@ def init_db() -> None:
         conn.execute(
             text("ALTER TABLE changelog ADD COLUMN IF NOT EXISTS snapshot JSONB")
         )
+        conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS updates_seen_at TIMESTAMPTZ")
+        )

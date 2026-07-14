@@ -28,6 +28,33 @@ export async function fetchHistory(): Promise<Msg[]> {
   return res.json();
 }
 
+/** One entry in the parent's Updates feed: an escalated question and, once staff
+ *  respond, their answer. Durable across sessions (independent of the chat). */
+export interface ParentUpdate {
+  id: string;
+  question: string;
+  answered: boolean;
+  answer: string | null;
+  category: string | null;
+  created_at: string | null;
+  answered_at: string | null;
+  unseen: boolean;
+}
+
+export async function fetchUpdates(): Promise<{
+  updates: ParentUpdate[];
+  unseen: number;
+}> {
+  const res = await fetch("/api/my/updates", { cache: "no-store" });
+  if (!res.ok) throw new Error(`updates failed: ${res.status}`);
+  return res.json();
+}
+
+/** Mark the Updates feed as read (clears the unseen badge). */
+export async function markUpdatesSeen(): Promise<void> {
+  await fetch("/api/my/updates/seen", { method: "POST" }).catch(() => {});
+}
+
 // Playful pre-K loading phrases shown with the typing dots while Sunny thinks.
 export const loadingPhrases: string[] = [
   "Playing with the Legos",

@@ -4,20 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import {
   askFrontDesk,
   chips,
-  fetchHistory,
+  fetchUpdates,
   loadingPhrases,
+  markUpdatesSeen,
   resultToMessage,
   type Msg,
+  type ParentUpdate,
 } from "@/lib/frontDesk";
 
 export default function ParentView() {
+  const [tab, setTab] = useState<"chat" | "updates">("chat");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [loadingPhrase, setLoadingPhrase] = useState("");
   const [openSources, setOpenSources] = useState<number[]>([]);
+  const [updates, setUpdates] = useState<ParentUpdate[]>([]);
+  const [unseen, setUnseen] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const sendingRef = useRef(false); // pause polling mid-send to keep optimistic UI
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -40,28 +44,40 @@ export default function ParentView() {
     return () => clearInterval(iv);
   }, [typing]);
 
-  // Keep the transcript live: load on mount, poll for new staff replies, and
-  // refresh on tab focus. Polling is skipped while a send is in flight so it
-  // doesn't clobber the optimistic user/assistant bubbles. (DB-only endpoint,
-  // cheap to poll; a websocket would be the production upgrade.)
+  // The chat itself is ephemeral — each login starts fresh, so we do NOT reload
+  // the transcript. Staff answers to escalated questions live in the durable
+  // Updates feed instead, which we poll (and refresh on focus) so late replies
+  // surface with an unseen badge even across sessions.
   useEffect(() => {
-    const load = () => {
-      if (sendingRef.current) return;
-      fetchHistory().then(setMessages).catch(() => {});
-    };
+    const load = () =>
+      fetchUpdates()
+        .then((r) => {
+          setUpdates(r.updates);
+          setUnseen(r.unseen);
+        })
+        .catch(() => {});
     load();
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", load);
-    const poll = setInterval(load, 2500);
+    const poll = setInterval(load, 5000);
     return () => {
       clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", load);
     };
   }, []);
+
+  // Opening the Updates tab marks it read (clears the badge).
+  const openUpdates = () => {
+    setTab("updates");
+    if (unseen > 0) {
+      setUnseen(0);
+      markUpdatesSeen();
+    }
+  };
 
   const toggleSource = (id: number) =>
     setOpenSources((prev) =>
@@ -72,7 +88,6 @@ export default function ParentView() {
     const t = (text || "").trim();
     if (!t) return;
     const uid = Date.now();
-    sendingRef.current = true;
     setMessages((s) => [...s, { id: uid, type: "user", text: t }]);
     setChatInput("");
     setTyping(true);
@@ -91,7 +106,6 @@ export default function ParentView() {
       ]);
     } finally {
       setTyping(false);
-      sendingRef.current = false;
     }
   };
 
@@ -184,6 +198,72 @@ export default function ParentView() {
           </div>
         </div>
 
+        {/* Chat / Updates tabs */}
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            padding: "8px 12px",
+            borderBottom: "1px solid #EBEFF4",
+            background: "#FFFFFF",
+          }}
+        >
+          {(
+            [
+              ["chat", "Chat"],
+              ["updates", "Updates"],
+            ] as const
+          ).map(([key, label]) => {
+            const active = tab === key;
+            return (
+              <button
+                key={key}
+                onClick={key === "updates" ? openUpdates : () => setTab("chat")}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 7,
+                  padding: "9px 12px",
+                  borderRadius: 10,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  background: active ? "#EEF1FF" : "transparent",
+                  color: active ? "#37458A" : "#737685",
+                  transition: "all .15s",
+                }}
+              >
+                {label}
+                {key === "updates" && unseen > 0 && (
+                  <span
+                    style={{
+                      background: "#FF5A5F",
+                      color: "#FFFFFF",
+                      fontSize: 11,
+                      fontWeight: 800,
+                      minWidth: 18,
+                      height: 18,
+                      padding: "0 5px",
+                      borderRadius: 999,
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
+                    {unseen}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === "updates" && <UpdatesFeed updates={updates} />}
+
+        {tab === "chat" && (
+          <>
         {/* Messages */}
         <div
           ref={scrollRef}
@@ -912,7 +992,178 @@ export default function ParentView() {
             </svg>
           </button>
         </div>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
+  if (updates.length === 0) {
+    return (
+      <div
+        className="fd-scroll"
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+          padding: "40px 28px",
+          textAlign: "center",
+          background: "#FBFCFE",
+        }}
+      >
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 16,
+            background: "#EEF1FF",
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#5463D6"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+            <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+          </svg>
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+          No updates yet
+        </div>
+        <div style={{ fontSize: "13.5px", color: "#737685", lineHeight: 1.5, maxWidth: 280 }}>
+          When you ask something our staff needs to handle personally, their reply
+          will show up here — even if you&apos;ve closed the app.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="fd-scroll"
+      style={{
+        flex: 1,
+        overflowY: "auto",
+        padding: "16px 16px 20px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        background: "#FBFCFE",
+      }}
+    >
+      {updates.map((u) => {
+        const answered = u.answered;
+        return (
+          <div
+            key={u.id}
+            style={{
+              background: "#FFFFFF",
+              border: `1px solid ${answered ? "#DDE7FF" : "#FFE1BB"}`,
+              borderRadius: 18,
+              padding: 16,
+              boxShadow: "0 8px 22px -16px rgba(30,37,73,.25)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: answered ? "#E7F7EE" : "#FFF6EB",
+                  color: answered ? "#227A47" : "#9A5A00",
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: 999,
+                    background: answered ? "#3BBA6E" : "#FF9D17",
+                    display: "inline-block",
+                  }}
+                />
+                {answered ? "Answered by staff" : "Waiting for staff"}
+              </span>
+              {u.unseen && (
+                <span
+                  style={{
+                    background: "#FF5A5F",
+                    color: "#FFFFFF",
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                  }}
+                >
+                  New
+                </span>
+              )}
+            </div>
+            <div
+              style={{
+                fontSize: "13.5px",
+                color: "#5C5E6A",
+                lineHeight: 1.45,
+              }}
+            >
+              <span style={{ fontWeight: 700, color: "#737685" }}>You asked: </span>
+              {u.question}
+            </div>
+            {answered && (
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: "1px solid #F0F2F7",
+                  fontSize: "14.5px",
+                  color: "#18181D",
+                  lineHeight: 1.55,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {u.answer}
+              </div>
+            )}
+            {!answered && (
+              <div
+                style={{
+                  marginTop: 10,
+                  fontSize: "12.5px",
+                  color: "#9A5A00",
+                }}
+              >
+                A teacher will follow up as soon as they can.
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

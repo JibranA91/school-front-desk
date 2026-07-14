@@ -239,6 +239,62 @@ def history(parent_id: str, db: Session = Depends(get_db)) -> list[dict]:
     return _thread_messages(db, pid) if pid else []
 
 
+# Which inquiry states belong in the parent's Updates feed — the questions that
+# went to staff (not the ones the AI already answered inline in chat).
+_UPDATE_STATES = ("escalated", "lowconf", "resolved")
+
+
+@app.get("/my/updates")
+def my_updates(parent_id: str, db: Session = Depends(get_db)) -> dict:
+    """The parent's escalated questions + staff answers — a durable notifications
+    feed, independent of the ephemeral chat session. `unseen` counts answers that
+    arrived since the parent last opened the feed."""
+    pid = _as_uuid(parent_id)
+    if pid is None:
+        return {"updates": [], "unseen": 0}
+    rows = db.scalars(
+        select(models.Inquiry)
+        .where(models.Inquiry.asker_id == pid)
+        .where(models.Inquiry.status.in_(_UPDATE_STATES))
+        .order_by(models.Inquiry.created_at.desc())
+    ).all()
+    user = db.get(models.User, pid)
+    seen_at = user.updates_seen_at if user else None
+
+    updates, unseen = [], 0
+    for r in rows:
+        answered = bool(r.resolution_text)
+        is_unseen = answered and (
+            seen_at is None or (r.resolved_at is not None and r.resolved_at > seen_at)
+        )
+        if is_unseen:
+            unseen += 1
+        updates.append(
+            {
+                "id": str(r.id),
+                "question": r.text,
+                "answered": answered,
+                "answer": r.resolution_text,
+                "category": r.category,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "answered_at": r.resolved_at.isoformat() if r.resolved_at else None,
+                "unseen": is_unseen,
+            }
+        )
+    return {"updates": updates, "unseen": unseen}
+
+
+@app.post("/my/updates/seen")
+def my_updates_seen(parent_id: str, db: Session = Depends(get_db)) -> dict:
+    """Mark the parent's Updates feed as read (clears the unseen badge)."""
+    pid = _as_uuid(parent_id)
+    user = db.get(models.User, pid) if pid else None
+    if user is not None:
+        user.updates_seen_at = datetime.now(timezone.utc)
+        db.commit()
+    return {"ok": True}
+
+
 class AuthorProposeRequest(BaseModel):
     instruction: str
 
