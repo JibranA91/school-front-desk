@@ -20,7 +20,7 @@ export default async function Home() {
     >
       <ViewportSync />
       <SessionBar name={user?.name ?? ""} />
-      <ParentView />
+      <ParentView userKey={user?.id ?? ""} />
     </div>
   );
 }

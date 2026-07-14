@@ -33,6 +33,13 @@ export default function SessionBar({ name }: { name: string }) {
         </span>
         <button
           onClick={async () => {
+            // End the chat session so the next login starts fresh (a refresh,
+            // which keeps sessionStorage, reuses it).
+            try {
+              sessionStorage.removeItem("fd-chat-session");
+            } catch {
+              /* ignore */
+            }
             // Clear the session, then navigate on the browser's own origin —
             // NextAuth's server-computed redirect can resolve to the container
             // bind host (0.0.0.0) behind the standalone server.

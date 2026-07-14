@@ -12,7 +12,35 @@ import {
   type ParentUpdate,
 } from "@/lib/frontDesk";
 
-export default function ParentView() {
+// A chat-session id that survives a page refresh but resets on a new login.
+// Stored in sessionStorage (per-tab, cleared when the tab closes) keyed by user,
+// and cleared on sign-out — so a refresh reuses it, a fresh login mints a new one.
+const SESSION_KEY = "fd-chat-session";
+function resolveSessionId(userKey: string): string {
+  const gen = () =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  if (typeof window === "undefined") return gen(); // SSR throwaway; client re-resolves
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p?.user === userKey && typeof p?.sid === "string") return p.sid;
+    }
+  } catch {
+    /* storage unavailable — fall through to a fresh id */
+  }
+  const sid = gen();
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: userKey, sid }));
+  } catch {
+    /* ignore */
+  }
+  return sid;
+}
+
+export default function ParentView({ userKey = "" }: { userKey?: string }) {
   const [tab, setTab] = useState<"chat" | "updates">("chat");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -22,15 +50,11 @@ export default function ParentView() {
   const [updates, setUpdates] = useState<ParentUpdate[]>([]);
   const [unseen, setUnseen] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  // A fresh chat-session id per mount (i.e. per login), tagged onto each question
-  // so the operator can identify and scope this sitting. crypto.randomUUID needs
-  // a secure context (absent on plain-http LAN), so fall back to a random id.
+  // The chat-session id tagged onto each question so the operator can identify
+  // and scope this sitting. Survives a refresh (sessionStorage), resets on login.
   const sessionIdRef = useRef<string | null>(null);
   if (sessionIdRef.current === null) {
-    sessionIdRef.current =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    sessionIdRef.current = resolveSessionId(userKey);
   }
 
   useEffect(() => {
