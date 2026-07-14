@@ -99,14 +99,20 @@ def seed_foundation(db) -> dict:
     p_ava = models.User(email="ava.parent@example.com", password_hash=pw, role="parent", name="Dana Ruiz")
     p_noah = models.User(email="noah.parent@example.com", password_hash=pw, role="parent", name="Sam Patel")
     p_liam = models.User(email="liam.parent@example.com", password_hash=pw, role="parent", name="Jordan Lee")
-    db.add_all([maria, p_ava, p_noah, p_liam])
+    p_mira = models.User(email="mira.parent@example.com", password_hash=pw, role="parent", name="Priya Shah")
+    p_theo = models.User(email="theo.parent@example.com", password_hash=pw, role="parent", name="Marcus Bell")
+    p_zoe = models.User(email="zoe.parent@example.com", password_hash=pw, role="parent", name="Emily Nguyen")
+    db.add_all([maria, p_ava, p_noah, p_liam, p_mira, p_theo, p_zoe])
     db.flush()
 
     # --- Children ---
     ava = models.Child(parent_id=p_ava.id, program_id=toddler.id, name="Ava")
     noah = models.Child(parent_id=p_noah.id, program_id=infant.id, name="Noah")
     liam = models.Child(parent_id=p_liam.id, program_id=preschool.id, name="Liam")
-    db.add_all([ava, noah, liam])
+    mira = models.Child(parent_id=p_mira.id, program_id=preschool.id, name="Mira")
+    theo = models.Child(parent_id=p_theo.id, program_id=toddler.id, name="Theo")
+    zoe = models.Child(parent_id=p_zoe.id, program_id=infant.id, name="Zoe")
+    db.add_all([ava, noah, liam, mira, theo, zoe])
     db.flush()
 
     # --- Menu (a rotating week, Mon–Fri) — live data, always present ---
@@ -117,12 +123,18 @@ def seed_foundation(db) -> dict:
         "p_ava": p_ava,
         "p_noah": p_noah,
         "p_liam": p_liam,
+        "p_mira": p_mira,
+        "p_theo": p_theo,
+        "p_zoe": p_zoe,
         "infant": infant,
         "toddler": toddler,
         "preschool": preschool,
         "ava": ava,
         "noah": noah,
         "liam": liam,
+        "mira": mira,
+        "theo": theo,
+        "zoe": zoe,
     }
 
 
@@ -224,10 +236,13 @@ def seed_inbox(db, refs: dict) -> None:
     Must run alongside seed_knowledge — some changelog rows carry entity_id FKs
     into the knowledge graph (tuition-infant, policy-illness)."""
     p_ava, p_noah, p_liam = refs["p_ava"], refs["p_noah"], refs["p_liam"]
+    p_mira, p_theo, p_zoe = refs["p_mira"], refs["p_theo"], refs["p_zoe"]
     ava, noah, liam = refs["ava"], refs["noah"], refs["liam"]
+    mira, theo, zoe = refs["mira"], refs["theo"], refs["zoe"]
     maria = refs["maria"]
 
-    # --- Inbox (inquiries) ---
+    # --- Inbox (inquiries) — every inquiry is tied to a real family, so none
+    # render as the anonymous "Prospective family" fallback. ---
     db.add_all(
         [
             models.Inquiry(
@@ -236,6 +251,7 @@ def seed_inbox(db, refs: dict) -> None:
                 status="escalated", category="health",
             ),
             models.Inquiry(
+                asker_id=p_mira.id, child_id=mira.id,
                 text="Do you offer a 3-day / part-time schedule?",
                 status="lowconf", group_key="part-time-schedule",
             ),
@@ -244,6 +260,7 @@ def seed_inbox(db, refs: dict) -> None:
                 text="What are your hours?", status="answered", confidence=0.98,
             ),
             models.Inquiry(
+                asker_id=p_zoe.id, child_id=zoe.id,
                 text="How much is infant tuition?", status="answered", confidence=0.97,
             ),
             models.Inquiry(
@@ -251,6 +268,7 @@ def seed_inbox(db, refs: dict) -> None:
                 text="Are you closed on Veterans Day?", status="answered", confidence=0.95,
             ),
             models.Inquiry(
+                asker_id=p_theo.id, child_id=theo.id,
                 text="Can I book a tour for next Tuesday?", status="answered", confidence=0.9,
             ),
         ]
