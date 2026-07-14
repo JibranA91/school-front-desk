@@ -101,20 +101,57 @@ button:focus-visible {
 }
 
 /* ---------------------------------------------------------------------------
-   Responsive overrides for phones/tablets. The components are inline-styled
-   (desktop-first), so these use !important to win over the inline base styles
-   at the breakpoint — same pattern as the hover states below.
+   Full-screen app shell (all screen sizes). The parent chat and operator
+   console fill the whole browser window — no floating-card framing — sized to
+   the visual viewport (--vvh, published by <ViewportSync>) so the mobile
+   keyboard shrinks the app instead of leaving a gap. Components are inline-
+   styled (desktop-first), so these use !important to win over the inline base.
+--------------------------------------------------------------------------- */
+.fd-page {
+  padding: 0 !important;
+  height: 100dvh !important;
+  height: var(--vvh, 100dvh) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+.fd-parent-card {
+  width: 100% !important;
+  max-width: 620px !important; /* comfortable chat column on wide screens */
+  height: 100dvh !important;
+  height: var(--vvh, 100dvh) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.fd-op-shell {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  height: 100dvh !important;
+  height: var(--vvh, 100dvh) !important;
+  min-height: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Phones/tablets: pin to the *visual* viewport (keyboard-safe — no gray gap,
+   no content shifting), go edge-to-edge, and turn the operator side rail into
+   a top tab bar.
 --------------------------------------------------------------------------- */
 @media (max-width: 720px) {
-  /* Full-screen app: no page chrome, pinned to the *visual* viewport so the
-     keyboard shrinks the app instead of scrolling the header off-screen.
-     --vvh is set from window.visualViewport by <ViewportSync>. */
-  .fd-page {
-    padding: 0 !important;
-    height: 100dvh !important;
-    height: var(--vvh, 100dvh) !important;
-    min-height: 0 !important;
+  /* Lock the body and pin the app to the visible region using visualViewport's
+     height + offsetTop, so the on-screen keyboard can't scroll the page (which
+     was exposing the body background as a gray gap below the content). */
+  html,
+  body {
     overflow: hidden !important;
+  }
+  .fd-page {
+    position: fixed !important;
+    top: var(--vvtop, 0px) !important;
+    left: 0 !important;
+    right: 0 !important;
     background: #ffffff !important;
   }
   /* iOS zooms into any input with font-size < 16px on focus, which visually
@@ -123,8 +160,10 @@ button:focus-visible {
   textarea {
     font-size: 16px !important;
   }
-  /* Sign-out floats over the app header as a compact pill (name hidden), so it
-     doesn't reserve a top gap. */
+  .fd-parent-card {
+    max-width: none !important; /* full width on phones */
+  }
+  /* Sign-out floats over the app header as a compact icon (name/label hidden). */
   .fd-sessionbar {
     top: 8px !important;
     right: 8px !important;
@@ -141,28 +180,9 @@ button:focus-visible {
     padding: 8px !important;
   }
 
-  /* Parent chat = edge-to-edge full screen (no card border/radius/shadow). */
-  .fd-parent-card {
-    width: 100% !important;
-    max-width: none !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    height: var(--vvh, 100dvh) !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-  }
-
-  /* Operator = full screen; the dark side rail becomes a top tab bar. */
+  /* Operator side rail becomes a top tab bar. */
   .fd-op-shell {
     flex-direction: column !important;
-    width: 100% !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    height: var(--vvh, 100dvh) !important;
-    min-height: 0 !important;
-    border: none !important;
-    border-radius: 0 !important;
   }
   .fd-op-sidebar {
     width: 100% !important;

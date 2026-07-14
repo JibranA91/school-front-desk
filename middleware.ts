@@ -32,6 +32,9 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Run on all routes except API (incl. /api/auth), Next internals, and assets.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.svg$).*)"],
+  // Run on all routes except API (incl. /api/auth), Next internals, and public
+  // assets (favicon, svgs, the PWA manifest — the browser fetches it unauthed).
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.svg$).*)",
+  ],
 };

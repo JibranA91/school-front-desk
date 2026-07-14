@@ -12,6 +12,13 @@ export const metadata: Metadata = {
   title: "AI Front Desk — Sunnyside Early Learning",
   description:
     "An AI front desk for early-education centers: trustworthy, grounded answers for parents and a control center for operators.",
+  manifest: "/manifest.webmanifest",
+  // iOS: launch chrome-free (no Safari address bar) when added to the home screen.
+  appleWebApp: {
+    capable: true,
+    title: "Sunnyside",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({

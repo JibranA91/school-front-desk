@@ -16,7 +16,12 @@ export default function ViewportSync() {
     const vv = window.visualViewport;
     if (!vv) return;
     const root = document.documentElement;
-    const apply = () => root.style.setProperty("--vvh", `${vv.height}px`);
+    const apply = () => {
+      root.style.setProperty("--vvh", `${vv.height}px`);
+      // offsetTop = how far iOS has scrolled the layout viewport to reveal the
+      // focused input; the fixed app follows it so no body background shows.
+      root.style.setProperty("--vvtop", `${vv.offsetTop}px`);
+    };
     apply();
     vv.addEventListener("resize", apply);
     vv.addEventListener("scroll", apply);
@@ -24,6 +29,7 @@ export default function ViewportSync() {
       vv.removeEventListener("resize", apply);
       vv.removeEventListener("scroll", apply);
       root.style.removeProperty("--vvh");
+      root.style.removeProperty("--vvtop");
     };
   }, []);
 
