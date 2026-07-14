@@ -22,6 +22,16 @@ export default function ParentView() {
   const [updates, setUpdates] = useState<ParentUpdate[]>([]);
   const [unseen, setUnseen] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // A fresh chat-session id per mount (i.e. per login), tagged onto each question
+  // so the operator can identify and scope this sitting. crypto.randomUUID needs
+  // a secure context (absent on plain-http LAN), so fall back to a random id.
+  const sessionIdRef = useRef<string | null>(null);
+  if (sessionIdRef.current === null) {
+    sessionIdRef.current =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  }
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -92,7 +102,7 @@ export default function ParentView() {
     setChatInput("");
     setTyping(true);
     try {
-      const result = await askFrontDesk(t);
+      const result = await askFrontDesk(t, sessionIdRef.current ?? undefined);
       setMessages((s) => [...s, resultToMessage(uid + 1, result)]);
     } catch {
       setMessages((s) => [
@@ -268,16 +278,17 @@ export default function ParentView() {
         <div
           ref={scrollRef}
           className="fd-scroll"
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "18px 16px 8px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-            background: "#FBFCFE",
-          }}
+          style={{ flex: 1, overflowY: "auto", background: "#FBFCFE" }}
         >
+          <div
+            className="fd-chat-col"
+            style={{
+              padding: "18px 16px 8px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
           <div
             style={{
               alignSelf: "flex-start",
@@ -884,6 +895,7 @@ export default function ParentView() {
               )}
             </div>
           )}
+          </div>
         </div>
 
         {/* Input */}
@@ -893,10 +905,13 @@ export default function ParentView() {
             borderTop: "1px solid #EBEFF4",
             background: "#FFFFFF",
             display: "flex",
-            alignItems: "center",
-            gap: 10,
+            justifyContent: "center",
           }}
         >
+          <div
+            className="fd-chat-col"
+            style={{ display: "flex", alignItems: "center", gap: 10 }}
+          >
           <div
             style={{
               flex: 1,
@@ -991,6 +1006,7 @@ export default function ParentView() {
               <path d="M22 2 11 13" />
             </svg>
           </button>
+          </div>
         </div>
           </>
         )}
@@ -1055,16 +1071,17 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
   return (
     <div
       className="fd-scroll"
-      style={{
-        flex: 1,
-        overflowY: "auto",
-        padding: "16px 16px 20px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        background: "#FBFCFE",
-      }}
+      style={{ flex: 1, overflowY: "auto", background: "#FBFCFE" }}
     >
+      <div
+        className="fd-chat-col"
+        style={{
+          padding: "16px 16px 20px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
       {updates.map((u) => {
         const answered = u.answered;
         return (
@@ -1164,6 +1181,7 @@ function UpdatesFeed({ updates }: { updates: ParentUpdate[] }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

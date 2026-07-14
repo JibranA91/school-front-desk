@@ -237,8 +237,35 @@ function InboxRow({
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: "#18181D" }}>{item.text}</div>
-        <div style={{ fontSize: "12.5px", color: "#737685", marginTop: 3 }}>
-          {item.who} · {timeAgo(item.created_at)}
+        <div
+          style={{
+            fontSize: "12.5px",
+            color: "#737685",
+            marginTop: 3,
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            flexWrap: "wrap",
+          }}
+        >
+          <span>
+            {item.who} · {timeAgo(item.created_at)}
+          </span>
+          {item.session && (
+            <span
+              style={{
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#5463D6",
+                background: "#EEF1FF",
+                padding: "1px 7px",
+                borderRadius: 6,
+              }}
+            >
+              #{item.session}
+            </span>
+          )}
         </div>
       </div>
       {count > 1 && (
@@ -850,8 +877,35 @@ function InquiryDetail({
         <div style={{ fontSize: 19, fontWeight: 700, color: "#18181D", marginTop: 14 }}>
           {item.text}
         </div>
-        <div style={{ fontSize: "13px", color: "#737685", marginTop: 6 }}>
-          {item.who} · {timeAgo(item.created_at)}
+        <div
+          style={{
+            fontSize: "13px",
+            color: "#737685",
+            marginTop: 6,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <span>
+            {item.who} · {timeAgo(item.created_at)}
+          </span>
+          {item.session && (
+            <span
+              style={{
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: "11.5px",
+                fontWeight: 700,
+                color: "#5463D6",
+                background: "#EEF1FF",
+                padding: "2px 8px",
+                borderRadius: 6,
+              }}
+            >
+              session #{item.session}
+            </span>
+          )}
         </div>
 
         {item.status === "resolved" && item.resolution_text && (

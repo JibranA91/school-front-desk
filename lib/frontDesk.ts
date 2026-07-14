@@ -117,11 +117,14 @@ export interface AskResult {
   needs_escalation?: boolean;
 }
 
-export async function askFrontDesk(question: string): Promise<AskResult> {
+export async function askFrontDesk(
+  question: string,
+  sessionId?: string
+): Promise<AskResult> {
   const res = await fetch("/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, session_id: sessionId }),
   });
   if (!res.ok) throw new Error(`ask failed: ${res.status}`);
   return res.json();
@@ -330,6 +333,7 @@ export async function deleteEntity(id: string): Promise<{ deleted: string }> {
 
 export interface Thread {
   who: string;
+  session: string;
   can_reply: boolean;
   messages: Msg[];
 }
@@ -375,6 +379,7 @@ export interface InboxItem {
   topic: string | null;
   confidence: number | null;
   who: string;
+  session: string;
   group_key: string | null;
   group_count: number;
   resolution_text: string | null;

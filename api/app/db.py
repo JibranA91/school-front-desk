@@ -49,3 +49,9 @@ def init_db() -> None:
         conn.execute(
             text("ALTER TABLE users ADD COLUMN IF NOT EXISTS updates_seen_at TIMESTAMPTZ")
         )
+        conn.execute(
+            text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS session_id VARCHAR(64)")
+        )
+        conn.execute(
+            text("ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS session_id VARCHAR(64)")
+        )

@@ -116,12 +116,19 @@ button:focus-visible {
 }
 .fd-parent-card {
   width: 100% !important;
-  max-width: 620px !important; /* comfortable chat column on wide screens */
+  max-width: none !important; /* fill the window; content is centered internally */
   height: 100dvh !important;
   height: var(--vvh, 100dvh) !important;
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+}
+/* Keep the chat readable on wide screens by centering the message list and the
+   input in a column; the header/tabs still span full width like an app bar. */
+.fd-chat-col {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
 }
 .fd-op-shell {
   width: 100% !important;

@@ -79,6 +79,7 @@ class AskRequest(BaseModel):
     question: str
     asker_id: str | None = None
     child_id: str | None = None
+    session_id: str | None = None
 
 
 class ActorRequest(BaseModel):
@@ -132,6 +133,31 @@ def _message_to_msg(m: models.Message, idx: int) -> dict:
             menu=c.get("menu"),
         )
     return out
+
+
+def _thread_up_to(db: Session, inq: models.Inquiry) -> list[dict]:
+    """Messages for the operator to read behind an inquiry: scoped to that
+    inquiry's chat session and cut off at the moment the question was asked —
+    so the operator sees the lead-up to *this* question, not later turns or
+    other sessions. Legacy inquiries (no session_id) fall back to time-only."""
+    conv = db.scalar(
+        select(models.Conversation)
+        .where(models.Conversation.parent_id == inq.asker_id)
+        .order_by(models.Conversation.created_at)
+        .limit(1)
+    )
+    if conv is None:
+        return []
+    q = (
+        select(models.Message)
+        .where(models.Message.conversation_id == conv.id)
+        .where(models.Message.created_at <= inq.created_at)
+        .order_by(models.Message.created_at)
+    )
+    if inq.session_id:
+        q = q.where(models.Message.session_id == inq.session_id)
+    rows = db.scalars(q).all()
+    return [_message_to_msg(m, i + 1) for i, m in enumerate(rows)]
 
 
 def _thread_messages(db: Session, parent_id: uuid.UUID) -> list[dict]:
@@ -197,7 +223,7 @@ def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
         db.add(
             models.Message(
                 conversation_id=conv.id, role="user", kind="user",
-                content={"text": body.question},
+                content={"text": body.question}, session_id=body.session_id,
             )
         )
         db.add(
@@ -209,6 +235,7 @@ def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
                     "source": result.get("source"),
                     "menu": result.get("menu"),
                 },
+                session_id=body.session_id,
             )
         )
         db.commit()
@@ -224,6 +251,7 @@ def ask(body: AskRequest, db: Session = Depends(get_db)) -> dict:
             topic=_topic_for(db, result),
             confidence=result.get("confidence"),
             group_key=result.get("group_key"),
+            session_id=body.session_id,
         )
         db.add(inquiry)
         db.commit()
@@ -501,9 +529,10 @@ def inbox_thread(inquiry_id: str, db: Session = Depends(get_db)) -> dict:
     inq = db.get(models.Inquiry, _as_uuid(inquiry_id))
     if inq is None:
         raise HTTPException(status_code=404, detail="Inquiry not found.")
-    messages = _thread_messages(db, inq.asker_id) if inq.asker_id else []
+    messages = _thread_up_to(db, inq) if inq.asker_id else []
     return {
         "who": _asker_context(db, inq),
+        "session": (inq.session_id or "")[:6],
         "can_reply": inq.asker_id is not None,
         "messages": messages,
     }
@@ -752,6 +781,7 @@ def inbox(db: Session = Depends(get_db)) -> list[dict]:
             "topic": r.topic,
             "confidence": r.confidence,
             "who": _asker_context(db, r),
+            "session": (r.session_id or "")[:6],
             "group_key": r.group_key,
             "group_count": open_counts.get(r.group_key, 1) if r.group_key else 1,
             "resolution_text": r.resolution_text,

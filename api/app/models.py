@@ -87,6 +87,9 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String(20))  # 'user' | 'assistant'
     kind: Mapped[str] = mapped_column(String(30))  # user|assistant-text|confident|escalation|lunch
     content: Mapped[dict] = mapped_column(JSONB)  # {text|answer|citation|source|menu...}
+    # The parent's chat session (fresh per login) — lets the operator see the
+    # context of just that sitting, not the whole persisted transcript.
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
@@ -106,6 +109,7 @@ class Inquiry(Base):
     topic: Mapped[str | None] = mapped_column(String(40), nullable=True)  # grouping: entity type / theme
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     group_key: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     resolution_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

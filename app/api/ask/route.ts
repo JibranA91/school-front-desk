@@ -13,8 +13,9 @@ export async function POST(req: Request) {
   }
 
   let question: unknown;
+  let sessionId: unknown;
   try {
-    ({ question } = await req.json());
+    ({ question, session_id: sessionId } = await req.json());
   } catch {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
@@ -26,7 +27,11 @@ export async function POST(req: Request) {
     const upstream = await fetch(`${API_BASE_URL}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, asker_id: session.user.id ?? null }),
+      body: JSON.stringify({
+        question,
+        asker_id: session.user.id ?? null,
+        session_id: typeof sessionId === "string" ? sessionId : null,
+      }),
     });
     if (!upstream.ok) {
       return NextResponse.json({ error: "front desk unavailable" }, { status: 502 });
