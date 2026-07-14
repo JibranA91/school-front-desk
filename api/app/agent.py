@@ -190,6 +190,32 @@ def _format_subgraph(entities: list[dict]) -> str:
     return "\n".join(lines) if lines else "(nothing relevant found in the knowledge base)"
 
 
+def _recover_citations(answer: str, entities: list[dict]) -> list[str]:
+    """Recover citations the model omitted. The parent model sometimes writes a
+    correct answer straight from the injected KNOWLEDGE but forgets to list the
+    entity id in `citations` — which would otherwise get the answer discarded as
+    ungrounded. Attribute it to the retrieved entities whose distinctive wording
+    the answer actually reflects. Returns [] when nothing in the subgraph supports
+    the answer, so an unsupported answer still stays uncited (treated as a gap) —
+    preserving the 'no ungrounded answers' guarantee."""
+    ans_terms = {w for w in re.findall(r"[a-z0-9]+", answer.lower()) if len(w) > 3}
+    if not ans_terms:
+        return []
+    scored: list[tuple[float, str]] = []
+    for e in entities:
+        attrs = e.get("attributes") or {}
+        body = attrs.get("body")
+        text = f"{e.get('name', '')} {body if isinstance(body, str) else ''}".lower()
+        terms = {w for w in re.findall(r"[a-z0-9]+", text) if len(w) > 3}
+        if not terms:
+            continue
+        overlap = len(terms & ans_terms) / len(terms)
+        if overlap >= 0.5:  # the answer reflects most of this entity's wording
+            scored.append((overlap, e["id"]))
+    scored.sort(reverse=True)
+    return [eid for _, eid in scored[:2]]
+
+
 # --------------------------------------------------------------------------- #
 # Bedrock path — all messages through the LLM, model-classified intent.
 # --------------------------------------------------------------------------- #
@@ -451,6 +477,10 @@ def _bedrock_answer(
     s: Answer = result["structured_response"]
     # A citation is valid if it's a real entity or a known live-data ref.
     valid = [c for c in s.citations if c in LIVE_SOURCES or kb.get_entity(c)]
+    # The model sometimes answers from the injected KNOWLEDGE but omits the id;
+    # recover it from the subgraph so a grounded answer isn't discarded as a gap.
+    if s.intent == "answer" and s.answer and not valid:
+        valid = _recover_citations(s.answer, subgraph.get("entities", []))
     citation, source = _citation_details(valid)
     return {
         "intent": s.intent,
