@@ -3,11 +3,6 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 
-const DEMO = [
-  { label: "Operator — Maria Chen", email: "maria@sunnyside.example" },
-  { label: "Parent — Ava's family", email: "ava.parent@example.com" },
-];
-
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -157,55 +152,6 @@ export default function LoginPage() {
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
-
-          {/* Demo helper (prototype only) */}
-          <div
-            style={{
-              marginTop: 18,
-              paddingTop: 16,
-              borderTop: "1px solid #F0F3F8",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11.5,
-                fontWeight: 700,
-                letterSpacing: ".04em",
-                textTransform: "uppercase",
-                color: "#737685",
-                marginBottom: 9,
-              }}
-            >
-              Demo accounts (password: demo1234)
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {DEMO.map((d) => (
-                <button
-                  key={d.email}
-                  type="button"
-                  className="fd-chip"
-                  onClick={() => {
-                    setEmail(d.email);
-                    setPassword("demo1234");
-                  }}
-                  style={{
-                    textAlign: "left",
-                    padding: "9px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #E3E8FF",
-                    background: "#F5F7FF",
-                    color: "#5463D6",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all .15s",
-                  }}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
         </form>
       </div>
     </div>
