@@ -180,6 +180,7 @@ def _thread_messages(db: Session, parent_id: uuid.UUID) -> list[dict]:
 # Topic (for inbox grouping) derived from what the answer was grounded in.
 _LIVE_TOPIC = {
     "live:menu": "Meal",
+    "live:menu-week": "Meal",
     "live:programs": "Program",
     "live:center": "Center",
     "live:children": "Enrollment",

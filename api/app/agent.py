@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from typing import Literal
 
 from sqlalchemy import select
@@ -41,6 +41,7 @@ DEFAULT_OOS_MSG = (
 # model cites instead of an entity id. Each maps to how we show provenance.
 LIVE_SOURCES: dict[str, tuple[str, str]] = {
     "live:menu": ("per Today’s Menu", "Today's Menu · synced from the kitchen this morning."),
+    "live:menu-week": ("per this week’s menu", "This week's menu · synced from the kitchen."),
     "live:programs": ("per our Programs", "Live from Sunnyside's program roster."),
     "live:center": ("per our Center details", "Live from Sunnyside's profile."),
     "live:children": ("per your enrollment record", "Live from your family's record."),
@@ -272,12 +273,41 @@ def _bedrock_answer(
     # --- Live-data tools (query the database directly, not the graph) ---
     @tool
     def get_todays_menu() -> dict:
-        """Today's lunch and snacks, synced live from the kitchen. Use for any
-        menu/lunch/food question. Cite ref 'live:menu'. If posted is false, today's
-        menu isn't up yet — tell the parent that plainly and offer to check with
-        staff; do NOT guess or describe a different day's menu."""
+        """TODAY's lunch and snacks, synced live from the kitchen. Use for
+        "what's for lunch today". Cite ref 'live:menu'. For tomorrow, a specific
+        weekday, or the whole week, use get_week_menu instead. If posted is false,
+        today's menu isn't up yet — say so plainly and offer to check with staff;
+        do NOT guess or describe a different day's menu."""
         menu = todays_menu(db)
         return {"ref": "live:menu", "items": menu or [], "posted": bool(menu)}
+
+    @tool
+    def get_week_menu() -> dict:
+        """This week's lunch menu by weekday (Mon–Fri), synced from the kitchen.
+        Use for menu questions about tomorrow, a specific day, or the whole week.
+        Cite ref 'live:menu-week'. Pick the day the parent asked about; if that day
+        has no entry, say the menu isn't posted for that day rather than guessing."""
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        rows = db.scalars(
+            select(models.MenuDay)
+            .where(models.MenuDay.day >= monday)
+            .where(models.MenuDay.day <= monday + timedelta(days=6))
+            .order_by(models.MenuDay.day)
+        ).all()
+        return {
+            "ref": "live:menu-week",
+            "today": today.isoformat(),
+            "days": [
+                {
+                    "date": m.day.isoformat(),
+                    "weekday": m.day.strftime("%A"),
+                    "is_today": m.day == today,
+                    "items": list(m.items or []),
+                }
+                for m in rows
+            ],
+        }
 
     @tool
     def get_programs() -> dict:
@@ -307,7 +337,7 @@ def _bedrock_answer(
             "hours": cfg.hours,
         }
 
-    tools = [get_todays_menu, get_programs, get_center_info]
+    tools = [get_todays_menu, get_week_menu, get_programs, get_center_info]
     if settings.kg_tools_enabled:
         tools = [search_graph, get_entity, expand_neighbors, *tools]
 
@@ -369,7 +399,8 @@ def _bedrock_answer(
         "- A question about the center: answer from the KNOWLEDGE above and ground it."
         + graph_tools_line
         + " For information that changes or is specific to this family, use the LIVE "
-        "tools: get_todays_menu (menu/lunch), get_programs (ages/ratios/rooms), "
+        "tools: get_todays_menu (today's lunch), get_week_menu (tomorrow / a specific "
+        "weekday / the whole week's lunches), get_programs (ages/ratios/rooms), "
         "get_center_info (phone/address/hours)"
         + (", get_my_children (this family's kids/rooms)" if asker_id is not None else "")
         + ". List every source you used in `citations` — entity ids and/or live refs "
