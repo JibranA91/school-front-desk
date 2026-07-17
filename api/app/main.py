@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from app.config import settings
 from app.model_catalog import resolve_chat_model
 from app.db import SessionLocal, get_db, init_db
-from app import agent, authoring, ingest, models, retrieval
+from app import agent, authoring, cleanup, ingest, models, retrieval
 from app.routers import auth as auth_router
 
 
@@ -53,6 +53,18 @@ async def lifespan(app: FastAPI):
     except Exception as exc:  # noqa: BLE001
         print(f"[startup] init_db skipped: {exc}")
     _maybe_seed_on_start()
+    # Deterministic expiry sweep: clear lapsed temporary overrides and restore
+    # any handbook facts they superseded. Cheap no-op when nothing is expired.
+    try:
+        with SessionLocal() as db:
+            swept = cleanup.sweep_expired(db)
+        if swept["removed"] or swept["restored"]:
+            print(
+                f"[startup] sweep_expired: removed {len(swept['removed'])}, "
+                f"restored {len(swept['restored'])}"
+            )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] sweep_expired skipped: {exc}")
     yield
 
 
@@ -775,6 +787,10 @@ def delete_entity(
             "as the source of record and can be re-enabled anytime.",
         )
     state = _entity_state(e)
+    # If this fact overrode others (e.g. a temporary override of a handbook
+    # fact), bring those back on before removing it — same restore the expiry
+    # sweep does, so a manual delete can't leave a silent coverage hole.
+    cleanup.restore_superseded(db, e, actor=body.actor)
     _delete_entity_cascade(db, e)
     db.add(
         models.ChangelogEntry(

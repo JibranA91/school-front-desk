@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Literal
 
 from sqlalchemy import select
@@ -33,6 +34,7 @@ def _entity_state(e: models.KbEntity) -> dict:
         "name": e.name,
         "attributes": dict(e.attributes or {}),
         "sources": list(e.sources or []),
+        "enabled": e.enabled,
     }
 
 
@@ -69,20 +71,40 @@ def propose(db: Session, instruction: str) -> dict:
             "prose that contradicts the structured value). Keep any existing detail that "
             "still applies."
         )
+        supersedes: str | None = Field(
+            default=None,
+            description="Set ONLY when this fact corrects/replaces a read-only handbook "
+            "entity (id starts 'hb-'): the handbook id being replaced. Use action='add' "
+            "with a new id in that case; the handbook fact is disabled, not edited.",
+        )
+        expires: str | None = Field(
+            default=None,
+            description="ISO date (YYYY-MM-DD) when a TEMPORARY change stops applying "
+            "(a holiday closure, a 'this week' note, etc.). Null for permanent facts.",
+        )
 
     class Proposal(BaseModel):
         summary: str = Field(description="Short label for this change, e.g. 'Weekday opening time'.")
         operations: list[Operation]
 
+    today = datetime.now(timezone.utc).date().isoformat()
     system = (
         "You maintain a childcare center's knowledge graph. Given the operator's plain-language "
-        "instruction and the current entities, output the MINIMAL set of operations to apply.\n"
+        f"instruction and the current entities, output the MINIMAL set of operations to apply. "
+        f"Today is {today}.\n"
         "- STRONGLY PREFER updating an existing entity that already covers this topic: use "
         "action='update' with that entity's EXACT id. Scan the current entities for one that is "
         "about the same thing, even if worded differently. Never create a new entity that would "
         "duplicate or contradict an existing one.\n"
+        "- HANDBOOK FACTS ARE READ-ONLY. Entities whose id starts with 'hb-' come from the "
+        "official handbook and must NEVER be updated. If the instruction corrects or contradicts "
+        "a handbook fact, use action='add' with a NEW kebab-case id for the corrected fact and "
+        "set `supersedes` to that handbook id — the handbook fact is disabled (kept as the "
+        "record) and your new fact takes over.\n"
         "- Use action='add' with a new kebab-case id ONLY for genuinely new information no "
-        "existing entity covers.\n"
+        "existing entity covers (or for a handbook override as above).\n"
+        "- If the change is TEMPORARY (a holiday closure, a 'this week' note, anything with an "
+        "end date), set `expires` to the ISO date (YYYY-MM-DD) it stops applying. Null otherwise.\n"
         "- `body` is the canonical, parent-facing statement of the fact — our answers to parents "
         "are grounded in it. For EVERY operation, write `body` as a complete sentence stating the "
         "corrected fact, so the wording can never contradict the structured value you set.\n"
@@ -102,7 +124,7 @@ def propose(db: Session, instruction: str) -> dict:
     has_conflict = False
     for op in proposal.operations:
         e = db.get(models.KbEntity, op.entity_id)
-        if e is None:
+        if e is None and not op.supersedes:
             twin = by_name.get(_norm(op.name))
             if twin is not None:
                 op.entity_id = twin.id
@@ -127,6 +149,8 @@ def propose(db: Session, instruction: str) -> dict:
                 "body": op.body,
                 "is_conflict": is_conflict,
                 "source": (e.sources[0] if e and e.sources else None) if e else None,
+                "supersedes": op.supersedes,
+                "expires": op.expires,
             }
         )
     return {"summary": proposal.summary, "changes": changes, "has_conflict": has_conflict}
@@ -153,6 +177,8 @@ def apply(
         if c.get("is_conflict") and not accept_conflicts:
             continue
         eid = c["entity_id"]
+        if eid.startswith("hb-"):
+            continue  # handbook is immutable; corrections arrive as a new node + `supersedes`
         e = db.get(models.KbEntity, eid)
         if eid not in before_state:
             before_state[eid] = _entity_state(e) if e is not None else None
@@ -173,6 +199,8 @@ def apply(
         # status flipped to "open" but body still said "closed").
         if c.get("body"):
             attrs["body"] = c["body"]
+        if c.get("expires"):
+            attrs["expires"] = c["expires"]
         e.attributes = attrs
         flag_modified(e, "attributes")
         touched[e.id] = e
@@ -195,6 +223,39 @@ def apply(
                 snapshot={"entity_id": eid, "before": before_state[eid]},
             )
         )
+
+    # Overrides: disable the fact each change replaces (typically a read-only
+    # handbook entity) and record a `supersedes` edge, so removing or expiring the
+    # override auto-restores what it replaced (see cleanup.restore_superseded).
+    for c in changes:
+        target_id = c.get("supersedes")
+        new_id = c["entity_id"]
+        if not target_id or new_id not in touched:
+            continue
+        target = db.get(models.KbEntity, target_id)
+        if target is None:
+            continue
+        if target.enabled:
+            db.add(
+                models.ChangelogEntry(
+                    actor=actor,
+                    actor_user_id=actor_user_id,
+                    action=f"Disabled {target.name} (replaced by {touched[new_id].name})",
+                    entity_id=target.id,
+                    is_diff=False,
+                    snapshot={"entity_id": target_id, "before": _entity_state(target)},
+                )
+            )
+            target.enabled = False
+        exists = db.scalar(
+            select(models.KbRelationship).where(
+                models.KbRelationship.rel == "supersedes",
+                models.KbRelationship.src_id == new_id,
+                models.KbRelationship.dst_id == target_id,
+            )
+        )
+        if exists is None:
+            db.add(models.KbRelationship(rel="supersedes", src_id=new_id, dst_id=target_id))
 
     if touched:  # re-embed changed entities so retrieval stays fresh
         entities = list(touched.values())
