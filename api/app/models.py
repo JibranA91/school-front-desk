@@ -126,6 +126,10 @@ class KbEntity(Base):
     name: Mapped[str] = mapped_column(String(160))
     attributes: Mapped[dict] = mapped_column(JSONB, default=dict)
     sources: Mapped[list] = mapped_column(JSONB, default=list)
+    # Soft on/off switch. A disabled entity stays in the graph (operator-visible,
+    # reversible) but is excluded from retrieval, so parents never see it. This is
+    # how a handbook fact is overridden without editing or deleting it.
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(settings.embedding_dims), nullable=True
     )

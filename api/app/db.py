@@ -55,3 +55,8 @@ def init_db() -> None:
         conn.execute(
             text("ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS session_id VARCHAR(64)")
         )
+        conn.execute(
+            text(
+                "ALTER TABLE kb_entities ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true"
+            )
+        )

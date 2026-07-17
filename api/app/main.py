@@ -531,6 +531,7 @@ def revert_change(
         e.attributes = dict(before.get("attributes") or {})
         flag_modified(e, "attributes")
         e.sources = list(before.get("sources") or [])
+        e.enabled = before.get("enabled", True)
         _reembed(db, e)
         action = f"Reverted change to {before['name']}"
         entity_id = e.id
@@ -613,6 +614,7 @@ def graph(db: Session = Depends(get_db)) -> dict:
             "name": e.name,
             "source": (e.sources[0] if e.sources else None),
             "handbook": e.id.startswith("hb-"),
+            "enabled": e.enabled,
         }
         for e in entities
     ]
@@ -639,6 +641,7 @@ def _entity_state(e: models.KbEntity) -> dict:
         "name": e.name,
         "attributes": dict(e.attributes or {}),
         "sources": list(e.sources or []),
+        "enabled": e.enabled,
     }
 
 
@@ -679,6 +682,7 @@ def list_entities(db: Session = Depends(get_db)) -> list[dict]:
             "sources": e.sources or [],
             "origin": _entity_origin(e),
             "connections": deg.get(e.id, 0),
+            "enabled": e.enabled,
             "updated_at": e.updated_at.isoformat() if e.updated_at else None,
         }
         for e in entities
@@ -704,6 +708,12 @@ def update_entity(
     e = db.get(models.KbEntity, entity_id)
     if e is None:
         raise HTTPException(status_code=404, detail="Entity not found.")
+    if entity_id.startswith("hb-"):
+        raise HTTPException(
+            status_code=409,
+            detail="Handbook facts are read-only. Disable it, or add an operator "
+            "fact that overrides it.",
+        )
 
     before = _entity_state(e)
     new_attrs = body.attributes if body.attributes is not None else dict(e.attributes or {})
@@ -758,6 +768,12 @@ def delete_entity(
     e = db.get(models.KbEntity, entity_id)
     if e is None:
         raise HTTPException(status_code=404, detail="Entity not found.")
+    if entity_id.startswith("hb-"):
+        raise HTTPException(
+            status_code=409,
+            detail="Handbook facts can't be deleted. Disable it instead — it stays "
+            "as the source of record and can be re-enabled anytime.",
+        )
     state = _entity_state(e)
     _delete_entity_cascade(db, e)
     db.add(
@@ -772,6 +788,41 @@ def delete_entity(
     )
     db.commit()
     return {"deleted": entity_id}
+
+
+class EnabledRequest(BaseModel):
+    enabled: bool
+    actor: str = "Operator"
+    actor_user_id: str | None = None
+
+
+@app.post("/entity/{entity_id}/enabled")
+def set_entity_enabled(
+    entity_id: str, body: EnabledRequest, db: Session = Depends(get_db)
+) -> dict:
+    """Enable/disable an entity — a reversible soft on/off switch. A disabled
+    entity stays in the graph but is excluded from retrieval, so parents never
+    see it. This is the ONLY mutation allowed on a handbook fact: it's how an
+    operator overrides the handbook without editing or deleting the source."""
+    e = db.get(models.KbEntity, entity_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="Entity not found.")
+    if e.enabled == body.enabled:
+        return {"ok": True, "id": e.id, "enabled": e.enabled}
+    before = _entity_state(e)
+    e.enabled = body.enabled
+    db.add(
+        models.ChangelogEntry(
+            actor=body.actor,
+            actor_user_id=_as_uuid(body.actor_user_id),
+            action=f"{'Enabled' if body.enabled else 'Disabled'} {e.name}",
+            entity_id=e.id,
+            is_diff=False,
+            snapshot={"entity_id": entity_id, "before": before},
+        )
+    )
+    db.commit()
+    return {"ok": True, "id": e.id, "enabled": e.enabled}
 
 
 def _asker_context(db: Session, inq: models.Inquiry) -> str:

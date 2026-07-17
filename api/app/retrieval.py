@@ -12,6 +12,7 @@ against entities that don't mention them — no manual stopword list needed.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from functools import lru_cache
 
 from sqlalchemy import Text, func, or_, select, text as sa_text
@@ -44,6 +45,31 @@ def _summary(e: models.KbEntity) -> dict:
     }
 
 
+def _today_iso() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _active_conditions():
+    """Retrieval guard: only enabled, non-expired entities are visible to the
+    agent (and thus to parents). `expires` is an ISO YYYY-MM-DD string in
+    attributes; ISO ordering is chronological, so `>= today` keeps live facts and
+    a missing key (NULL) is always kept. Disabled/expired facts stay in the graph
+    for the operator but never reach a parent answer."""
+    exp = models.KbEntity.attributes["expires"].astext
+    return (
+        models.KbEntity.enabled.is_(True),
+        or_(exp.is_(None), exp >= _today_iso()),
+    )
+
+
+def _is_active(e: models.KbEntity) -> bool:
+    """Python mirror of `_active_conditions`, for by-id fetches / graph expansion."""
+    if not e.enabled:
+        return False
+    exp = (e.attributes or {}).get("expires")
+    return not (isinstance(exp, str) and exp and exp < _today_iso())
+
+
 def _searchable(entity=models.KbEntity):
     """SQL text we run FTS over: entity name + all attribute values (the JSONB
     cast to text). Matches the breadth of what the old word-overlap scored."""
@@ -69,7 +95,9 @@ def _lexical_search(db: Session, query: str, k: int) -> list[dict]:
         f"replace(plainto_tsquery('{_TS_CONFIG}', :q)::text, ' & ', ' | ')::tsquery"
     ).bindparams(q=query)
     lexical = func.ts_rank_cd(tsv, tsq).label("lex")
-    rows = db.execute(select(models.KbEntity, lexical)).all()
+    rows = db.execute(
+        select(models.KbEntity, lexical).where(*_active_conditions())
+    ).all()
 
     max_lex = max((float(r.lex) for r in rows), default=0.0) or 1.0
     scored = sorted(
@@ -106,7 +134,7 @@ def search_graph(db: Session, query: str, k: int = 5) -> list[dict]:
 
     rows = db.execute(
         select(models.KbEntity, semantic, lexical).where(
-            models.KbEntity.embedding.is_not(None)
+            models.KbEntity.embedding.is_not(None), *_active_conditions()
         )
     ).all()
 
@@ -130,7 +158,7 @@ def search_graph(db: Session, query: str, k: int = 5) -> list[dict]:
 
 def get_entity(db: Session, entity_id: str) -> dict | None:
     e = db.get(models.KbEntity, entity_id)
-    return _summary(e) if e else None
+    return _summary(e) if e and _is_active(e) else None
 
 
 def expand_neighbors(db: Session, entity_id: str, rel: str | None = None) -> list[dict]:
@@ -147,7 +175,7 @@ def expand_neighbors(db: Session, entity_id: str, rel: str | None = None) -> lis
     for r in db.scalars(q).all():
         other_id = r.dst_id if r.src_id == entity_id else r.src_id
         e = db.get(models.KbEntity, other_id)
-        if e:
+        if e and _is_active(e):
             s = _summary(e)
             s["via"] = r.rel
             neighbors.append(s)
