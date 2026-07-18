@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import EntityInspector from "@/components/EntityInspector";
 import InboxPanel from "@/components/InboxPanel";
 import KnowledgeGraph from "@/components/KnowledgeGraph";
+import CleanupPanel from "@/components/CleanupPanel";
 import {
   applyChange,
   changelog as seedChangelog,
@@ -1029,6 +1030,13 @@ export default function OperatorView({
 
             <EntityInspector
               reloadToken={graphToken}
+              onChanged={() => {
+                refreshLog();
+                setGraphToken((t) => t + 1);
+              }}
+            />
+
+            <CleanupPanel
               onChanged={() => {
                 refreshLog();
                 setGraphToken((t) => t + 1);

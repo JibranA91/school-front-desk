@@ -284,6 +284,7 @@ export interface KbEntityDetail {
   sources: string[];
   origin: EntityOrigin;
   connections: number;
+  enabled?: boolean;
   updated_at: string | null;
 }
 
@@ -464,6 +465,70 @@ export async function revertChange(id: string): Promise<{ ok: boolean }> {
     throw new Error(msg?.error ?? `revert failed: ${res.status}`);
   }
   return res.json();
+}
+
+// ---- Operator: knowledge-hygiene ("Clean") scan ----
+
+export interface CleanupFinding {
+  id: string;
+  kind: "outdated" | "redundancy" | "contradiction";
+  tier: "deterministic" | "llm";
+  summary: string;
+  rationale: string;
+  entities: string[];
+  action: {
+    type: "none" | "delete" | "disable" | "resolve" | "merge_needed";
+    entity_id?: string;
+    keep?: string;
+    entities?: string[];
+  };
+  confidence: number;
+}
+
+export interface CleanupResult {
+  status: "running" | "done" | "error";
+  phase?: string;
+  mode?: string;
+  swept?: { removed: string[]; restored: string[] };
+  findings: CleanupFinding[];
+  error?: string;
+}
+
+/** Start a hygiene scan and poll it to completion, reporting live progress. */
+export async function runCleanupScan(
+  mode: "quick" | "deep",
+  onProgress?: (phase: string) => void,
+): Promise<CleanupResult> {
+  const start = await fetch("/api/clean/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
+  });
+  if (!start.ok) throw new Error(`scan failed: ${start.status}`);
+  const { job_id } = await start.json();
+
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 700));
+    const res = await fetch(`/api/clean/status/${job_id}`, { cache: "no-store" });
+    if (!res.ok) continue; // transient; keep polling
+    const p: CleanupResult = await res.json();
+    onProgress?.(p.phase ?? "Scanning…");
+    if (p.status === "done") return p;
+    if (p.status === "error") throw new Error(p.error ?? "scan failed");
+  }
+}
+
+/** Toggle an entity's enabled flag (reversible soft on/off). */
+export async function setEntityEnabled(id: string, enabled: boolean): Promise<void> {
+  const res = await fetch(`/api/entity/${encodeURIComponent(id)}/enabled`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) {
+    const m = await res.json().catch(() => ({}));
+    throw new Error(m?.error ?? `toggle failed: ${res.status}`);
+  }
 }
 
 export const changelog: ChangelogEntry[] = [
