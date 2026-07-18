@@ -225,6 +225,12 @@ button:focus-visible {
   .fd-pad {
     padding: 18px 14px !important;
   }
+
+  /* Conflict modal: stack the two option cards on narrow screens instead of
+     squeezing them into two columns. */
+  .fd-conflict-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* Hover states — !important so they win over the ported inline base styles */

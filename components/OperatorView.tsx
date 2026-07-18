@@ -72,12 +72,70 @@ export default function OperatorView({
   const [inboxResetKey, setInboxResetKey] = useState(0);
   const [revertConfirmId, setRevertConfirmId] = useState<string | null>(null);
   const [revertBusyId, setRevertBusyId] = useState<string | null>(null);
+  const [authorError, setAuthorError] = useState<string | null>(null);
+  const [revertError, setRevertError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const importPanelRef = useRef<HTMLDivElement | null>(null);
+  const conflictPanelRef = useRef<HTMLDivElement | null>(null);
 
   const refreshLog = () => fetchChangelog().then(setLog).catch(() => {});
   useEffect(() => {
     refreshLog();
   }, []);
+
+  // Accessibility wiring for whichever confirm/conflict modal is open: move
+  // focus into the panel, trap Tab inside it, Escape closes, and focus returns
+  // to the trigger on close. (The knowledge-editor modal uses useDialogA11y;
+  // these two are inline, so the same behaviour lives here.)
+  useEffect(() => {
+    if (!pendingFile && !conflictOpen) return;
+    const prev = document.activeElement as HTMLElement | null;
+    const panel = conflictOpen ? conflictPanelRef.current : importPanelRef.current;
+    const focusables = (): HTMLElement[] =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((el) => el.offsetParent !== null)
+        : [];
+    (focusables()[0] ?? panel)?.focus();
+
+    const closeOpen = () => {
+      if (conflictOpen) {
+        setConflictOpen(false);
+        setProposal(null);
+        setAuthorText("");
+      } else {
+        setPendingFile(null);
+        if (fileRef.current) fileRef.current.value = "";
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeOpen();
+        return;
+      }
+      if (e.key === "Tab") {
+        const f = focusables();
+        if (f.length === 0) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      prev?.focus?.();
+    };
+  }, [pendingFile, conflictOpen]);
 
   // Picking a file opens a confirmation dialog rather than importing straight away.
   const onHandbookPicked = (file: File | undefined) => {
@@ -119,13 +177,18 @@ export default function OperatorView({
     const t = authorText.trim();
     if (!t || busy) return;
     setBusy(true);
+    setAuthorError(null);
     try {
       const p = await proposeChange(t);
       setProposal(p);
       if (p.has_conflict) setConflictOpen(true);
       else setProposalState("proposed");
-    } catch {
-      /* leave idle */
+    } catch (e) {
+      setAuthorError(
+        e instanceof Error
+          ? e.message
+          : "Couldn't draft that change. Please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -134,13 +197,18 @@ export default function OperatorView({
   const confirmProposal = async () => {
     if (!proposal || busy) return;
     setBusy(true);
+    setAuthorError(null);
     try {
       await applyChange(proposal.changes, proposal.summary, true);
       setProposalState("confirmed");
       refreshLog();
       setGraphToken((t) => t + 1);
-    } catch {
-      /* noop */
+    } catch (e) {
+      setAuthorError(
+        e instanceof Error
+          ? e.message
+          : "Couldn't publish that change. Nothing was saved — please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -150,11 +218,13 @@ export default function OperatorView({
     setProposalState("idle");
     setProposal(null);
     setAuthorText("");
+    setAuthorError(null);
   };
 
   const resolveNew = async () => {
     if (!proposal || busy) return;
     setBusy(true);
+    setAuthorError(null);
     try {
       await applyChange(proposal.changes, proposal.summary, true);
       setConflictOpen(false);
@@ -162,8 +232,13 @@ export default function OperatorView({
       setAuthorText("");
       refreshLog();
       setGraphToken((t) => t + 1);
-    } catch {
-      /* noop */
+    } catch (e) {
+      setConflictOpen(false);
+      setAuthorError(
+        e instanceof Error
+          ? e.message
+          : "Couldn't publish that change. Nothing was saved — please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -177,13 +252,18 @@ export default function OperatorView({
 
   const doRevert = async (id: string) => {
     setRevertBusyId(id);
+    setRevertError(null);
     try {
       await revertChange(id);
       setRevertConfirmId(null);
       refreshLog();
       setGraphToken((t) => t + 1);
-    } catch {
-      /* leave the entry as-is */
+    } catch (e) {
+      setRevertError(
+        e instanceof Error
+          ? e.message
+          : "Couldn't undo that change. Please try again.",
+      );
     } finally {
       setRevertBusyId(null);
     }
@@ -281,6 +361,7 @@ export default function OperatorView({
         <div className="fd-op-nav" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <button
             className="fd-nav"
+            aria-current={nav === "inbox" ? "page" : undefined}
             onClick={() => {
               setNav("inbox");
               setInboxResetKey((k) => k + 1); // also pop back to the list
@@ -318,6 +399,7 @@ export default function OperatorView({
           </button>
           <button
             className="fd-nav"
+            aria-current={nav === "knowledge" ? "page" : undefined}
             onClick={() => setNav("knowledge")}
             style={navBtn(nav === "knowledge")}
           >
@@ -338,6 +420,7 @@ export default function OperatorView({
           </button>
           <button
             className="fd-nav"
+            aria-current={nav === "changelog" ? "page" : undefined}
             onClick={() => setNav("changelog")}
             style={navBtn(nav === "changelog")}
           >
@@ -424,8 +507,9 @@ export default function OperatorView({
 
         {nav === "knowledge" && (
           <div className="fd-pad" style={{ padding: "30px 34px", maxWidth: 760 }}>
-            <div
+            <h2
               style={{
+                margin: 0,
                 fontSize: 24,
                 fontWeight: 800,
                 color: "#18181D",
@@ -433,7 +517,7 @@ export default function OperatorView({
               }}
             >
               Knowledge
-            </div>
+            </h2>
             <div style={{ fontSize: 14, color: "#5C5E6A", marginTop: 4 }}>
               Teach the front desk in plain language. I&apos;ll turn it into a
               precise change and check it against what parents already see.
@@ -763,6 +847,51 @@ export default function OperatorView({
               </div>
             </div>
 
+            {authorError && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 16,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  background: "#FDEFF2",
+                  border: "1px solid #F6C6D0",
+                  borderRadius: 12,
+                  padding: "12px 14px",
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    color: "#B0122F",
+                    fontSize: "13.5px",
+                    fontWeight: 600,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {authorError}
+                </span>
+                <button
+                  onClick={() => setAuthorError(null)}
+                  aria-label="Dismiss error"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#B0122F",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    minHeight: 32,
+                    flexShrink: 0,
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {proposalState === "proposed" && (
               <div
                 style={{
@@ -1081,8 +1210,9 @@ export default function OperatorView({
 
         {nav === "changelog" && (
           <div className="fd-pad" style={{ padding: "30px 34px", maxWidth: 720 }}>
-            <div
+            <h2
               style={{
+                margin: 0,
                 fontSize: 24,
                 fontWeight: 800,
                 color: "#18181D",
@@ -1090,10 +1220,54 @@ export default function OperatorView({
               }}
             >
               Changelog
-            </div>
+            </h2>
             <div style={{ fontSize: 14, color: "#5C5E6A", marginTop: 4 }}>
               Every change to what parents see — who, what, and when.
             </div>
+            {revertError && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 16,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  background: "#FDEFF2",
+                  border: "1px solid #F6C6D0",
+                  borderRadius: 12,
+                  padding: "12px 14px",
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    color: "#B0122F",
+                    fontSize: "13.5px",
+                    fontWeight: 600,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {revertError}
+                </span>
+                <button
+                  onClick={() => setRevertError(null)}
+                  aria-label="Dismiss error"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#B0122F",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    minHeight: 32,
+                    flexShrink: 0,
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
             <div style={{ marginTop: 24 }}>
               {log.map((c, idx) => (
                 <div key={idx} style={{ display: "flex", gap: 15 }}>
@@ -1317,6 +1491,11 @@ export default function OperatorView({
           }}
         >
           <div
+            ref={importPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fd-import-title"
+            tabIndex={-1}
             style={{
               background: "#FFFFFF",
               borderRadius: 22,
@@ -1326,7 +1505,10 @@ export default function OperatorView({
               padding: "24px 24px 20px",
             }}
           >
-            <div style={{ fontSize: 17, fontWeight: 800, color: "#18181D", letterSpacing: "-.01em" }}>
+            <div
+              id="fd-import-title"
+              style={{ fontSize: 17, fontWeight: 800, color: "#18181D", letterSpacing: "-.01em" }}
+            >
               Import this handbook?
             </div>
             <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 10, lineHeight: 1.5 }}>
@@ -1386,6 +1568,11 @@ export default function OperatorView({
           }}
         >
           <div
+            ref={conflictPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fd-conflict-title"
+            tabIndex={-1}
             style={{
               background: "#FFFFFF",
               borderRadius: 22,
@@ -1431,6 +1618,7 @@ export default function OperatorView({
               </div>
               <div>
                 <div
+                  id="fd-conflict-title"
                   style={{
                     fontSize: 17,
                     fontWeight: 800,
@@ -1454,6 +1642,7 @@ export default function OperatorView({
               </div>
             </div>
             <div
+              className="fd-conflict-grid"
               style={{
                 padding: "0 24px",
                 display: "grid",

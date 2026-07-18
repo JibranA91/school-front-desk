@@ -147,9 +147,9 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
         >
           <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
         </svg>
-        <span style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#18181D", margin: 0 }}>
           Clean up the knowledge base
-        </span>
+        </h3>
       </div>
       <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
         Scans for stale, duplicate, and conflicting facts.{" "}
@@ -375,6 +375,7 @@ function FindingRow({
   onDismiss: () => void;
 }) {
   const k = KIND[f.kind] ?? { bg: "#EEF1FF", color: "#4B57B8", label: f.kind };
+  const anyBusy = busy !== null; // any in-flight action disables every card's controls
   const added = (id: string) => fmtDate(meta[id]?.created);
 
   // Conflicts: prefer the fact added later — recommend turning off the older one.
@@ -415,6 +416,7 @@ function FindingRow({
         ) : (
           <button
             onClick={onDismiss}
+            disabled={anyBusy}
             className="fd-ghost"
             style={{
               border: "1px solid #EBEFF4",
@@ -425,7 +427,8 @@ function FindingRow({
               minHeight: 40,
               fontSize: 12.5,
               fontWeight: 600,
-              cursor: "pointer",
+              cursor: anyBusy ? "default" : "pointer",
+              opacity: anyBusy ? 0.5 : 1,
             }}
           >
             Dismiss
@@ -483,7 +486,8 @@ function FindingRow({
                 </div>
                 <ActionBtn
                   label="Turn off"
-                  disabled={busy === `${f.id}:${id}`}
+                  disabled={anyBusy}
+                  loading={busy === `${f.id}:${id}`}
                   onClick={() => onDisable(id, `${f.id}:${id}`)}
                 />
               </div>
@@ -503,7 +507,8 @@ function FindingRow({
               <ActionBtn
                 key={id}
                 label={`Turn off "${label(id)}"`}
-                disabled={busy === `${f.id}:${id}`}
+                disabled={anyBusy}
+                loading={busy === `${f.id}:${id}`}
                 onClick={() => onDisable(id, `${f.id}:${id}`)}
               />
             ))}
@@ -531,14 +536,16 @@ function FindingRow({
             <ActionBtn
               label="Delete the duplicate"
               danger
-              disabled={busy === f.id}
+              disabled={anyBusy}
+              loading={busy === f.id}
               onClick={() => onDelete(f.action.entity_id!)}
             />
           )}
           {f.action.type === "disable" && (
             <ActionBtn
               label="Disable the duplicate"
-              disabled={busy === f.id}
+              disabled={anyBusy}
+              loading={busy === f.id}
               onClick={() => onDisable(f.action.entity_id!, f.id)}
             />
           )}
@@ -566,12 +573,14 @@ function ActionBtn({
   danger,
   primary,
   disabled,
+  loading,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
   primary?: boolean;
   disabled?: boolean;
+  loading?: boolean;
 }) {
   const style = primary
     ? { bg: "#5463D6", color: "#FFFFFF", border: "#5463D6" }
@@ -597,6 +606,22 @@ function ActionBtn({
         maxWidth: "100%",
       }}
     >
+      {loading && (
+        <span
+          aria-hidden="true"
+          style={{
+            display: "inline-block",
+            width: 12,
+            height: 12,
+            marginRight: 6,
+            verticalAlign: "-1px",
+            borderRadius: 999,
+            border: "2px solid currentColor",
+            borderTopColor: "transparent",
+            animation: "fdSpin .7s linear infinite",
+          }}
+        />
+      )}
       {label}
     </button>
   );

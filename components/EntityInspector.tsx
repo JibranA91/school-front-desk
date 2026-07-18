@@ -11,6 +11,7 @@ import {
   type EntityOrigin,
   type KbEntityDetail,
 } from "@/lib/frontDesk";
+import { useDialogA11y } from "@/components/useDialogA11y";
 
 type Filter = "all" | EntityOrigin;
 
@@ -116,7 +117,9 @@ export default function EntityInspector({
         >
           <path d="M4 6h16M4 12h16M4 18h10" />
         </svg>
-        <span style={{ flex: 1 }}>Browse &amp; edit knowledge</span>
+        <h3 style={{ flex: 1, margin: 0, fontSize: "inherit", fontWeight: "inherit" }}>
+          Browse &amp; edit knowledge
+        </h3>
         <span style={{ fontSize: "12.5px", color: "#737685", fontWeight: 600 }}>
           {counts.all} entries
         </span>
@@ -333,6 +336,19 @@ function EntityEditor({
     }
   };
 
+  const dirty =
+    !isHandbook &&
+    (name !== entity.name ||
+      type !== entity.type ||
+      fields.some((f) => f.value !== toStr(entity.attributes[f.key])));
+
+  const requestClose = () => {
+    if (dirty && !window.confirm("Discard your unsaved changes?")) return;
+    onClose();
+  };
+
+  const dialogRef = useDialogA11y<HTMLDivElement>(requestClose);
+
   const setValue = (i: number, value: string) =>
     setFields((f) => f.map((row, j) => (j === i ? { ...row, value } : row)));
 
@@ -364,7 +380,7 @@ function EntityEditor({
 
   return (
     <div
-      onClick={onClose}
+      onClick={requestClose}
       style={{
         position: "fixed",
         inset: 0,
@@ -377,6 +393,11 @@ function EntityEditor({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Edit ${entity.name}`}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="fd-scroll"
         style={{
@@ -600,7 +621,7 @@ function EntityEditor({
               ))}
             <div style={{ flex: 1, minWidth: 8 }} />
             <button
-              onClick={onClose}
+              onClick={requestClose}
               disabled={busy}
               style={{
                 background: "transparent",
