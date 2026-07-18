@@ -17,7 +17,22 @@ const KIND: Record<string, { bg: string; color: string; label: string }> = {
   contradiction: { bg: "#FDEFF2", color: "#CF193A", label: "Conflict" },
 };
 
-type Meta = { name: string; origin: string; enabled: boolean };
+// Stacked sections, most-actionable first.
+const GROUPS: { kind: string; label: string }[] = [
+  { kind: "contradiction", label: "Conflicts" },
+  { kind: "redundancy", label: "Duplicates" },
+  { kind: "outdated", label: "Expiring soon" },
+];
+
+type Meta = { name: string; origin: string; enabled: boolean; created: string | null };
+
+const fmtDate = (iso: string | null | undefined): string | null => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
 
 export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
   const [mode, setMode] = useState<"quick" | "deep">("quick");
@@ -35,10 +50,15 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
       const ents = await fetchEntities();
       const m: Record<string, Meta> = {};
       for (const e of ents)
-        m[e.id] = { name: e.name, origin: e.origin, enabled: e.enabled ?? true };
+        m[e.id] = {
+          name: e.name,
+          origin: e.origin,
+          enabled: e.enabled ?? true,
+          created: e.created_at ?? null,
+        };
       setMeta(m);
     } catch {
-      /* labels are best-effort */
+      /* labels/dates are best-effort */
     }
   };
 
@@ -130,7 +150,6 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
           marginTop: 14,
         }}
       >
-        {/* Quick / Deep toggle */}
         <div style={{ display: "flex", background: "#F0F2F7", borderRadius: 10, padding: 3 }}>
           {(["quick", "deep"] as const).map((m) => (
             <button
@@ -199,7 +218,6 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
 
       {result && !running && (
         <div style={{ marginTop: 16 }}>
-          {/* Auto-handled sweep summary */}
           {sweptCount > 0 && (
             <div style={{ fontSize: 13, color: "#227A47", marginBottom: 12 }}>
               Auto-handled: {swept!.removed.length} expired removed,{" "}
@@ -222,20 +240,47 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
               ✓ Nothing to clean up — the knowledge base looks healthy.
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {findings.map((f) => (
-                <FindingRow
-                  key={f.id}
-                  f={f}
-                  label={label}
-                  meta={meta}
-                  busy={busy}
-                  applied={applied.has(f.id)}
-                  onDelete={(id) => act(f.id, () => deleteEntity(id))}
-                  onDisable={(id, key) => act(key, () => setEntityEnabled(id, false))}
-                  onDismiss={() => dismiss(f.id)}
-                />
-              ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {GROUPS.map((g) => {
+                const items = findings.filter((f) => f.kind === g.kind);
+                if (items.length === 0) return null;
+                const k = KIND[g.kind];
+                return (
+                  <div key={g.kind}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          letterSpacing: ".03em",
+                          textTransform: "uppercase",
+                          color: k.color,
+                        }}
+                      >
+                        {g.label}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#9497A6" }}>
+                        {items.length}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {items.map((f) => (
+                        <FindingRow
+                          key={f.id}
+                          f={f}
+                          label={label}
+                          meta={meta}
+                          busy={busy}
+                          applied={applied.has(f.id)}
+                          onDelete={(id) => act(f.id, () => deleteEntity(id))}
+                          onDisable={(id, key) => act(key, () => setEntityEnabled(id, false))}
+                          onDismiss={() => dismiss(f.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -264,6 +309,17 @@ function FindingRow({
   onDismiss: () => void;
 }) {
   const k = KIND[f.kind] ?? { bg: "#EEF1FF", color: "#4B57B8", label: f.kind };
+  const added = (id: string) => fmtDate(meta[id]?.created);
+
+  // Conflicts: prefer the fact added later — recommend turning off the older one.
+  let conflict: { newer: string; older: string } | null = null;
+  if (f.kind === "contradiction" && f.entities.length === 2) {
+    const [x, y] = f.entities;
+    const cx = meta[x]?.created ?? "";
+    const cy = meta[y]?.created ?? "";
+    conflict = cx >= cy ? { newer: x, older: y } : { newer: y, older: x };
+  }
+
   return (
     <div
       style={{
@@ -273,6 +329,7 @@ function FindingRow({
         padding: "12px 14px",
       }}
     >
+      {/* Header: badge + dismiss/applied. Summary lives on its own line below. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span
           style={{
@@ -286,9 +343,7 @@ function FindingRow({
         >
           {k.label}
         </span>
-        <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#18181D" }}>
-          {f.summary}
-        </span>
+        <div style={{ flex: 1 }} />
         {applied ? (
           <span style={{ fontSize: 13, fontWeight: 700, color: "#227A47" }}>✓ Applied</span>
         ) : (
@@ -310,48 +365,129 @@ function FindingRow({
           </button>
         )}
       </div>
+
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#18181D", marginTop: 8, lineHeight: 1.4 }}>
+        {f.summary}
+      </div>
       <div style={{ fontSize: 12.5, color: "#737685", marginTop: 6, lineHeight: 1.5 }}>
         {f.rationale}
       </div>
 
-      {!applied && (
+      {!applied && f.kind === "contradiction" && conflict && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          {[conflict.newer, conflict.older].map((id) => {
+            const isNewer = id === conflict!.newer;
+            const d = added(id);
+            return (
+              <div
+                key={id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  background: "#FFFFFF",
+                  border: "1px solid #EBEFF4",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#18181D" }}>
+                    {label(id)}
+                    {isNewer && (
+                      <span
+                        style={{
+                          marginLeft: 6,
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          color: "#227A47",
+                          background: "#E7F7EE",
+                          borderRadius: 999,
+                          padding: "2px 7px",
+                        }}
+                      >
+                        Newer · keep
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "#9497A6", marginTop: 2 }}>
+                    {d ? `Added ${d}` : "Date unknown"}
+                  </div>
+                </div>
+                <ActionBtn
+                  label="Turn off"
+                  primary={!isNewer}
+                  disabled={busy === `${f.id}:${id}`}
+                  onClick={() => onDisable(id, `${f.id}:${id}`)}
+                />
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 12, color: "#5C5E6A" }}>
+            Recommended: keep the newer fact, turn off the older one.
+          </div>
+        </div>
+      )}
+
+      {!applied && f.kind === "contradiction" && !conflict && (
         <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-          {f.kind === "redundancy" && f.action.type === "delete" && (
+          {f.entities
+            .filter((id) => meta[id]?.enabled !== false)
+            .map((id) => (
+              <ActionBtn
+                key={id}
+                label={`Turn off "${label(id)}"`}
+                disabled={busy === `${f.id}:${id}`}
+                onClick={() => onDisable(id, `${f.id}:${id}`)}
+              />
+            ))}
+        </div>
+      )}
+
+      {!applied && f.kind === "redundancy" && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 11.5, color: "#9497A6", marginBottom: 8 }}>
+            {f.action.keep && (
+              <>
+                Keep{" "}
+                <span style={{ color: "#5C5E6A", fontWeight: 600 }}>{label(f.action.keep)}</span>
+                {added(f.action.keep) ? ` (added ${added(f.action.keep)})` : ""}.{" "}
+              </>
+            )}
+            {f.action.entity_id && (
+              <>
+                Remove {label(f.action.entity_id)}
+                {added(f.action.entity_id) ? ` (added ${added(f.action.entity_id)})` : ""}.
+              </>
+            )}
+          </div>
+          {f.action.type === "delete" && (
             <ActionBtn
-              label={`Delete “${label(f.action.entity_id!)}”`}
+              label={`Delete "${label(f.action.entity_id!)}"`}
               danger
               disabled={busy === f.id}
               onClick={() => onDelete(f.action.entity_id!)}
             />
           )}
-          {f.kind === "redundancy" && f.action.type === "disable" && (
+          {f.action.type === "disable" && (
             <ActionBtn
-              label={`Disable “${label(f.action.entity_id!)}”`}
+              label={`Disable "${label(f.action.entity_id!)}"`}
               disabled={busy === f.id}
               onClick={() => onDisable(f.action.entity_id!, f.id)}
             />
           )}
-          {f.kind === "redundancy" && f.action.type === "merge_needed" && (
+          {f.action.type === "merge_needed" && (
             <span style={{ fontSize: 12.5, color: "#B5710A" }}>
               Keeps unique links — needs a merge (coming soon).
             </span>
           )}
-          {f.kind === "contradiction" &&
-            f.entities
-              .filter((id) => meta[id]?.enabled !== false)
-              .map((id) => (
-                <ActionBtn
-                  key={id}
-                  label={`Turn off “${label(id)}”`}
-                  disabled={busy === `${f.id}:${id}`}
-                  onClick={() => onDisable(id, `${f.id}:${id}`)}
-                />
-              ))}
-          {f.kind === "outdated" && (
-            <span style={{ fontSize: 12.5, color: "#737685" }}>
-              Auto-removes on its date — no action needed.
-            </span>
-          )}
+        </div>
+      )}
+
+      {!applied && f.kind === "outdated" && (
+        <div style={{ marginTop: 10, fontSize: 12.5, color: "#737685" }}>
+          {added(f.entities[0]) ? `Added ${added(f.entities[0])} · ` : ""}
+          Auto-removes on its date — no action needed.
         </div>
       )}
     </div>
@@ -362,27 +498,36 @@ function ActionBtn({
   label,
   onClick,
   danger,
+  primary,
   disabled,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  primary?: boolean;
   disabled?: boolean;
 }) {
+  const style = primary
+    ? { bg: "#5463D6", color: "#FFFFFF", border: "#5463D6" }
+    : danger
+      ? { bg: "#FDEFF2", color: "#CF193A", border: "#F6C9D2" }
+      : { bg: "#F5F7FF", color: "#5463D6", border: "#DCE1FF" };
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       style={{
-        border: `1px solid ${danger ? "#F6C9D2" : "#DCE1FF"}`,
-        background: danger ? "#FDEFF2" : "#F5F7FF",
-        color: danger ? "#CF193A" : "#5463D6",
+        border: `1px solid ${style.border}`,
+        background: style.bg,
+        color: style.color,
         borderRadius: 8,
         padding: "6px 12px",
         fontSize: 12.5,
         fontWeight: 700,
         cursor: disabled ? "default" : "pointer",
         opacity: disabled ? 0.6 : 1,
+        flexShrink: 0,
+        whiteSpace: "nowrap",
       }}
     >
       {label}

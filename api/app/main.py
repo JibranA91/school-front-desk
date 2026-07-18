@@ -695,6 +695,7 @@ def list_entities(db: Session = Depends(get_db)) -> list[dict]:
             "origin": _entity_origin(e),
             "connections": deg.get(e.id, 0),
             "enabled": e.enabled,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
             "updated_at": e.updated_at.isoformat() if e.updated_at else None,
         }
         for e in entities

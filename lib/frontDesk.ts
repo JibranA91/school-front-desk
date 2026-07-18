@@ -291,6 +291,7 @@ export interface KbEntityDetail {
   origin: EntityOrigin;
   connections: number;
   enabled?: boolean;
+  created_at?: string | null;
   updated_at: string | null;
 }
 
