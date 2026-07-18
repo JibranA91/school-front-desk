@@ -485,7 +485,7 @@ function FindingRow({
           </div>
           {f.action.type === "delete" && (
             <ActionBtn
-              label={`Delete "${label(f.action.entity_id!)}"`}
+              label="Delete the duplicate"
               danger
               disabled={busy === f.id}
               onClick={() => onDelete(f.action.entity_id!)}
@@ -493,7 +493,7 @@ function FindingRow({
           )}
           {f.action.type === "disable" && (
             <ActionBtn
-              label={`Disable "${label(f.action.entity_id!)}"`}
+              label="Disable the duplicate"
               disabled={busy === f.id}
               onClick={() => onDisable(f.action.entity_id!, f.id)}
             />
@@ -549,7 +549,7 @@ function ActionBtn({
         cursor: disabled ? "default" : "pointer",
         opacity: disabled ? 0.6 : 1,
         flexShrink: 0,
-        whiteSpace: "nowrap",
+        maxWidth: "100%",
       }}
     >
       {label}
