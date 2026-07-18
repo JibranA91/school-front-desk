@@ -99,6 +99,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
   const dismiss = (id: string) => setDismissed((s) => new Set(s).add(id));
 
   const findings = (result?.findings ?? []).filter((f) => !dismissed.has(f.id));
+  const pending = findings.filter((f) => !applied.has(f.id));
   const swept = result?.swept;
   const sweptCount = (swept?.removed.length ?? 0) + (swept?.restored.length ?? 0);
 
@@ -225,7 +226,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
             </div>
           )}
 
-          {findings.length === 0 ? (
+          {findings.length === 0 || pending.length === 0 ? (
             <div
               style={{
                 fontSize: 14,
@@ -237,14 +238,18 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
                 fontWeight: 600,
               }}
             >
-              ✓ Nothing to clean up — the knowledge base looks healthy.
+              {findings.length === 0
+                ? "✓ Nothing to clean up — the knowledge base looks healthy."
+                : "✓ All caught up — every finding reviewed."}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
               {GROUPS.map((g) => {
-                const items = findings.filter((f) => f.kind === g.kind);
-                if (items.length === 0) return null;
+                const queue = pending.filter((f) => f.kind === g.kind);
+                if (queue.length === 0) return null;
                 const k = KIND[g.kind];
+                const f = queue[0];
+                const peeks = Math.min(2, queue.length - 1);
                 return (
                   <div key={g.kind}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -260,23 +265,40 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
                         {g.label}
                       </span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#9497A6" }}>
-                        {items.length}
+                        {queue.length} left
                       </span>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {items.map((f) => (
+                    {/* Card deck — one at a time; resolving or dismissing reveals the next. */}
+                    <div style={{ position: "relative", marginBottom: peeks * 6 }}>
+                      {Array.from({ length: peeks }).map((_, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            position: "absolute",
+                            left: 9 * (i + 1),
+                            right: 9 * (i + 1),
+                            bottom: -6 * (i + 1),
+                            height: 26,
+                            background: "#F4F6FB",
+                            border: "1px solid #EBEFF4",
+                            borderRadius: 12,
+                            zIndex: 0,
+                          }}
+                        />
+                      ))}
+                      <div style={{ position: "relative", zIndex: 1 }}>
                         <FindingRow
                           key={f.id}
                           f={f}
                           label={label}
                           meta={meta}
                           busy={busy}
-                          applied={applied.has(f.id)}
+                          applied={false}
                           onDelete={(id) => act(f.id, () => deleteEntity(id))}
                           onDisable={(id, key) => act(key, () => setEntityEnabled(id, false))}
                           onDismiss={() => dismiss(f.id)}
                         />
-                      ))}
+                      </div>
                     </div>
                   </div>
                 );
