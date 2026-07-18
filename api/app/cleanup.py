@@ -11,10 +11,11 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app import models
+from app.config import settings
 
 
 def today_iso() -> str:
@@ -280,12 +281,7 @@ class RedundancyCheck:
             for m in members:
                 if m.id == survivor.id:
                     continue
-                if _origin(m) == "handbook":
-                    action = {"type": "disable", "entity_id": m.id, "keep": survivor.id}
-                elif _edge_safe(db, m.id, survivor.id):
-                    action = {"type": "delete", "entity_id": m.id, "keep": survivor.id}
-                else:
-                    action = {"type": "merge_needed", "entity_id": m.id, "keep": survivor.id}
+                action = _redundancy_action(db, m, survivor)
                 out.append(
                     Finding(
                         id=f"redundancy:{m.id}->{survivor.id}",
@@ -346,12 +342,178 @@ class ContradictionCheck:
         return out
 
 
+def _redundancy_action(db: Session, remove: models.KbEntity, survivor: models.KbEntity) -> dict:
+    """How to resolve a duplicate: a handbook fact is never deleted (disable it);
+    delete only when lossless; otherwise it needs a (later) merge."""
+    if _origin(remove) == "handbook":
+        return {"type": "disable", "entity_id": remove.id, "keep": survivor.id}
+    if _edge_safe(db, remove.id, survivor.id):
+        return {"type": "delete", "entity_id": remove.id, "keep": survivor.id}
+    return {"type": "merge_needed", "entity_id": remove.id, "keep": survivor.id}
+
+
+def _blurb(e: models.KbEntity) -> str:
+    attrs = e.attributes or {}
+    body = attrs.get("body")
+    if isinstance(body, str) and body.strip():
+        return body.strip()[:220]
+    facts = "; ".join(f"{k}={v}" for k, v in attrs.items() if k != "body" and v not in (None, ""))
+    return facts[:220] or e.name
+
+
+def _near_pairs(db: Session, max_dist: float, limit: int) -> list[tuple[str, str, float]]:
+    """Candidate near-neighbour pairs via pgvector kNN (the same `<=>` operator
+    link_similar uses). Each unordered pair once (b.id > a.id), only enabled +
+    embedded nodes, within max_dist cosine distance, closest first. No LLM."""
+    rows = db.execute(
+        text(
+            """
+            SELECT a.id AS a, nn.id AS b, nn.dist AS dist
+            FROM kb_entities a
+            JOIN LATERAL (
+                SELECT b.id, a.embedding <=> b.embedding AS dist
+                FROM kb_entities b
+                WHERE b.id > a.id AND b.embedding IS NOT NULL AND b.enabled
+                ORDER BY a.embedding <=> b.embedding
+                LIMIT 4
+            ) nn ON true
+            WHERE a.embedding IS NOT NULL AND a.enabled AND nn.dist <= :max_dist
+            ORDER BY nn.dist
+            LIMIT :limit
+            """
+        ),
+        {"max_dist": max_dist, "limit": limit},
+    ).all()
+    return [(r.a, r.b, float(r.dist)) for r in rows]
+
+
+def _classify_pairs(db: Session, pairs: list[tuple[str, str, float]]) -> dict[int, tuple[str, str]]:
+    """LLM-classify each candidate pair as duplicate / contradiction / distinct.
+    Runs in SMALL batches — a large structured-output list is unreliable (the
+    tool-call response truncates and fails to parse past ~10 items), so we chunk
+    and merge. Each batch is best-effort: a failed batch is logged and skipped,
+    not fatal. Returns {pair_index: (relation, reason)}."""
+    from typing import Literal as _Lit
+
+    from pydantic import BaseModel, Field
+
+    from app.llm import get_chat_model
+
+    ids = {i for p in pairs for i in (p[0], p[1])}
+    ents = {
+        e.id: e
+        for e in db.scalars(select(models.KbEntity).where(models.KbEntity.id.in_(ids))).all()
+    }
+
+    class Verdict(BaseModel):
+        index: int
+        relation: _Lit["duplicate", "contradiction", "distinct"]
+        reason: str = Field(description="One short clause.")
+
+    class Verdicts(BaseModel):
+        verdicts: list[Verdict]
+
+    preamble = (
+        "You audit a childcare center's knowledge base for hygiene. For each "
+        "numbered pair of facts, classify the relationship:\n"
+        "- duplicate: they state the SAME fact (one is redundant), even if worded "
+        "differently.\n"
+        "- contradiction: same topic but CONFLICTING information.\n"
+        "- distinct: legitimately different facts (most pairs).\n"
+        "Be conservative — only say duplicate/contradiction when clear. Give a "
+        "verdict for EVERY index.\n\nPAIRS:\n"
+    )
+    model = get_chat_model(settings.chat_model, temperature=0).with_structured_output(Verdicts)
+
+    out: dict[int, tuple[str, str]] = {}
+    CHUNK = 8
+    for start in range(0, len(pairs), CHUNK):
+        lines = []
+        for i in range(start, min(start + CHUNK, len(pairs))):
+            a, b, _d = pairs[i]
+            ea, eb = ents.get(a), ents.get(b)
+            if ea is None or eb is None:
+                continue
+            lines.append(f"[{i}] A = {ea.name}: {_blurb(ea)}\n     B = {eb.name}: {_blurb(eb)}")
+        if not lines:
+            continue
+        try:
+            result = model.invoke(preamble + "\n".join(lines))
+            for v in result.verdicts:
+                out[v.index] = (v.relation, v.reason)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[cleanup] pair-classify batch @{start} failed: {exc}")
+    return out
+
+
+class LlmPairCheck:
+    """Deep tier: pgvector kNN proposes near-neighbour candidate pairs, then ONE
+    batched LLM call confirms duplicates / contradictions the deterministic tiers
+    (identical text, shared-field conflicts) can't catch. No-op in Quick mode, or
+    when embeddings / the LLM are off."""
+
+    key = "AI review"
+
+    def scan(self, db: Session, mode: str) -> list[Finding]:
+        if mode != "deep" or not settings.llm_enabled or not settings.embeddings_enabled:
+            return []
+        pairs = _near_pairs(db, max_dist=0.30, limit=40)
+        if not pairs:
+            return []
+        verdicts = _classify_pairs(db, pairs)
+        deg = _degrees(db)
+        out: list[Finding] = []
+        for i, (a, b, dist) in enumerate(pairs):
+            rel, reason = verdicts.get(i, ("distinct", ""))
+            if rel == "distinct":
+                continue
+            ea, eb = db.get(models.KbEntity, a), db.get(models.KbEntity, b)
+            if ea is None or eb is None:
+                continue
+            conf = round(max(0.5, 1.0 - dist), 2)
+            if rel == "duplicate":
+                survivor = _pick_survivor([ea, eb], deg)
+                remove = eb if survivor.id == ea.id else ea
+                out.append(
+                    Finding(
+                        id=f"redundancy:{remove.id}->{survivor.id}",
+                        kind="redundancy",
+                        tier="llm",
+                        summary=f"'{remove.name}' looks like a duplicate of '{survivor.name}'",
+                        rationale=(reason or "Judged to state the same fact.")
+                        + f" Keep '{survivor.id}' ({_origin(survivor)}).",
+                        entities=[remove.id, survivor.id],
+                        action=_redundancy_action(db, remove, survivor),
+                        confidence=conf,
+                    )
+                )
+            elif rel == "contradiction":
+                out.append(
+                    Finding(
+                        id=f"contradiction:{'+'.join(sorted([a, b]))}",
+                        kind="contradiction",
+                        tier="llm",
+                        summary=f"'{ea.name}' and '{eb.name}' may conflict",
+                        rationale=reason or "Judged to give conflicting information.",
+                        entities=[a, b],
+                        action={"type": "resolve", "entities": [a, b]},
+                        confidence=conf,
+                    )
+                )
+        return out
+
+
 class CleanupEngine:
     """Runs the registered checks and returns their findings. Add/remove/reorder
     checks here without touching the job, the API, or the UI."""
 
     def __init__(self, checks: list | None = None):
-        self.checks = checks or [OutdatedCheck(), RedundancyCheck(), ContradictionCheck()]
+        self.checks = checks or [
+            OutdatedCheck(),
+            RedundancyCheck(),
+            ContradictionCheck(),
+            LlmPairCheck(),
+        ]
 
     def scan(self, db: Session, mode: str = "quick", progress=None) -> dict:
         # Deterministic expiry is handled first (past-due auto-removed + restored),
@@ -363,4 +525,8 @@ class CleanupEngine:
             if progress:
                 progress(check.key, i, total)
             findings.extend(f.as_dict() for f in check.scan(db, mode))
-        return {"mode": mode, "swept": swept, "findings": findings}
+        # De-dupe by finding id — a pair can surface from both a deterministic and
+        # the LLM tier; the earlier (deterministic) one wins.
+        seen: set[str] = set()
+        unique = [f for f in findings if not (f["id"] in seen or seen.add(f["id"]))]
+        return {"mode": mode, "swept": swept, "findings": unique}
