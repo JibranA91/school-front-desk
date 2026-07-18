@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   runCleanupScan,
@@ -44,6 +44,14 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
   const [applied, setApplied] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [meta, setMeta] = useState<Record<string, Meta>>({});
+  const [flash, setFlash] = useState("");
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showFlash = (msg: string) => {
+    setFlash(msg);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(""), 2500);
+  };
 
   const loadMeta = async () => {
     try {
@@ -81,12 +89,20 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
 
   const label = (id: string) => meta[id]?.name ?? id;
 
-  const act = async (key: string, fn: () => Promise<unknown>) => {
-    setBusy(key);
+  // busyKey drives the per-button spinner; findingId is what the deck advances on
+  // (a conflict has two buttons but resolving either one clears the whole card).
+  const act = async (
+    busyKey: string,
+    findingId: string,
+    fn: () => Promise<unknown>,
+    msg: string,
+  ) => {
+    setBusy(busyKey);
     setError("");
     try {
       await fn();
-      setApplied((s) => new Set(s).add(key));
+      setApplied((s) => new Set(s).add(findingId));
+      showFlash(msg);
       onChanged();
       loadMeta();
     } catch (e) {
@@ -96,7 +112,10 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
     }
   };
 
-  const dismiss = (id: string) => setDismissed((s) => new Set(s).add(id));
+  const dismiss = (id: string) => {
+    setDismissed((s) => new Set(s).add(id));
+    showFlash("Dismissed — showing the next.");
+  };
 
   const findings = (result?.findings ?? []).filter((f) => !dismissed.has(f.id));
   const pending = findings.filter((f) => !applied.has(f.id));
@@ -219,6 +238,22 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
 
       {result && !running && (
         <div style={{ marginTop: 16 }}>
+          {flash && (
+            <div
+              style={{
+                marginBottom: 12,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#227A47",
+                background: "#E7F7EE",
+                border: "1px solid #BFE9CF",
+                borderRadius: 10,
+                padding: "9px 12px",
+              }}
+            >
+              {flash}
+            </div>
+          )}
           {sweptCount > 0 && (
             <div style={{ fontSize: 13, color: "#227A47", marginBottom: 12 }}>
               Auto-handled: {swept!.removed.length} expired removed,{" "}
@@ -294,8 +329,12 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
                           meta={meta}
                           busy={busy}
                           applied={false}
-                          onDelete={(id) => act(f.id, () => deleteEntity(id))}
-                          onDisable={(id, key) => act(key, () => setEntityEnabled(id, false))}
+                          onDelete={(id) =>
+                            act(f.id, f.id, () => deleteEntity(id), `Removed ${label(id)}.`)
+                          }
+                          onDisable={(id, key) =>
+                            act(key, f.id, () => setEntityEnabled(id, false), `Turned off ${label(id)}.`)
+                          }
                           onDismiss={() => dismiss(f.id)}
                         />
                       </div>
@@ -438,7 +477,6 @@ function FindingRow({
                 </div>
                 <ActionBtn
                   label="Turn off"
-                  primary={!isNewer}
                   disabled={busy === `${f.id}:${id}`}
                   onClick={() => onDisable(id, `${f.id}:${id}`)}
                 />
