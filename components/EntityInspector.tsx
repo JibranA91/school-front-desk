@@ -281,6 +281,10 @@ export default function EntityInspector({
           onClose={() => setSelected(null)}
           onSaved={afterMutate}
           onDeleted={afterMutate}
+          onToggled={() => {
+            refresh();
+            onChanged?.();
+          }}
         />
       )}
     </div>
@@ -292,11 +296,13 @@ function EntityEditor({
   onClose,
   onSaved,
   onDeleted,
+  onToggled,
 }: {
   entity: KbEntityDetail;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
+  onToggled: () => void;
 }) {
   const [name, setName] = useState(entity.name);
   const [type, setType] = useState(entity.type);
@@ -308,16 +314,19 @@ function EntityEditor({
   const [err, setErr] = useState<string | null>(null);
   const o = originStyles[entity.origin];
   const isHandbook = entity.origin === "handbook";
-  const enabled = entity.enabled ?? true;
+  const [enabled, setEnabled] = useState(entity.enabled ?? true);
 
   const toggleEnabled = async () => {
     setBusy(true);
     setErr(null);
+    const next = !enabled;
     try {
-      await setEntityEnabled(entity.id, !enabled);
-      onSaved(); // refresh the list + close; the row reflects the new state
+      await setEntityEnabled(entity.id, next);
+      setEnabled(next);
+      onToggled(); // refresh the list/graph behind the modal, but keep it open
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Toggle failed");
+    } finally {
       setBusy(false);
     }
   };
@@ -396,10 +405,20 @@ function EntityEditor({
         </div>
 
         <label style={labelStyle}>Name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          readOnly={isHandbook}
+          style={isHandbook ? roInputStyle : inputStyle}
+        />
 
         <label style={labelStyle}>Type</label>
-        <input value={type} onChange={(e) => setType(e.target.value)} style={inputStyle} />
+        <input
+          value={type}
+          onChange={(e) => setType(e.target.value)}
+          readOnly={isHandbook}
+          style={isHandbook ? roInputStyle : inputStyle}
+        />
 
         <label style={labelStyle}>Attributes</label>
         {fields.length === 0 && (
@@ -413,7 +432,13 @@ function EntityEditor({
             <textarea
               value={f.value}
               onChange={(e) => setValue(i, e.target.value)}
-              style={{ ...inputStyle, marginTop: 4, minHeight: 44, resize: "vertical" }}
+              readOnly={isHandbook}
+              style={{
+                ...(isHandbook ? roInputStyle : inputStyle),
+                marginTop: 4,
+                minHeight: 44,
+                resize: "vertical",
+              }}
             />
           </div>
         ))}
@@ -467,25 +492,53 @@ function EntityEditor({
             marginTop: 20,
           }}
         >
-          <button
-            onClick={toggleEnabled}
-            disabled={busy}
-            title={
-              enabled ? "Hide this fact from parents" : "Show this fact to parents"
-            }
-            style={{
-              background: enabled ? "transparent" : "#E7F7EE",
-              color: enabled ? "#8A5A00" : "#227A47",
-              border: `1px solid ${enabled ? "#FFE1BB" : "#BFE9CF"}`,
-              borderRadius: 11,
-              padding: "10px 16px",
-              fontSize: "13px",
-              fontWeight: 700,
-              cursor: busy ? "default" : "pointer",
-            }}
-          >
-            {enabled ? "Turn off" : "Turn on"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              role="switch"
+              aria-checked={enabled}
+              onClick={toggleEnabled}
+              disabled={busy}
+              title={
+                enabled ? "Hide this fact from parents" : "Show this fact to parents"
+              }
+              style={{
+                position: "relative",
+                width: 42,
+                height: 24,
+                borderRadius: 999,
+                border: "none",
+                background: enabled ? "#5463D6" : "#C4C8D4",
+                cursor: busy ? "default" : "pointer",
+                transition: "background .15s",
+                flexShrink: 0,
+                padding: 0,
+                opacity: busy ? 0.7 : 1,
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 3,
+                  left: enabled ? 21 : 3,
+                  width: 18,
+                  height: 18,
+                  borderRadius: 999,
+                  background: "#FFFFFF",
+                  transition: "left .15s",
+                  boxShadow: "0 1px 3px rgba(24,24,29,.3)",
+                }}
+              />
+            </button>
+            <span
+              style={{
+                fontSize: "13px",
+                fontWeight: 600,
+                color: enabled ? "#227A47" : "#737685",
+              }}
+            >
+              {enabled ? "Visible to parents" : "Hidden from parents"}
+            </span>
+          </div>
           {!isHandbook &&
             (!confirmDelete ? (
               <button
@@ -585,4 +638,12 @@ const inputStyle = {
   color: "#18181D",
   fontFamily: "inherit",
   lineHeight: 1.5,
+} as const;
+
+// Read-only variant for immutable (handbook) fields — visibly non-editable.
+const roInputStyle = {
+  ...inputStyle,
+  background: "#F0F2F7",
+  color: "#737685",
+  cursor: "not-allowed",
 } as const;
