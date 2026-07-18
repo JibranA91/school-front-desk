@@ -484,14 +484,8 @@ function EntityEditor({
           </div>
         )}
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginTop: 20,
-          }}
-        >
+        <div style={{ marginTop: 20 }}>
+          {/* Visibility — its own row so the label never wraps or crowds the actions */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
               role="switch"
@@ -533,84 +527,99 @@ function EntityEditor({
               style={{
                 fontSize: "13px",
                 fontWeight: 600,
+                whiteSpace: "nowrap",
                 color: enabled ? "#227A47" : "#737685",
               }}
             >
               {enabled ? "Visible to parents" : "Hidden from parents"}
             </span>
           </div>
-          {!isHandbook &&
-            (!confirmDelete ? (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                disabled={busy}
-                style={{
-                  background: "transparent",
-                  color: "#CF193A",
-                  border: "1px solid #F6C9D2",
-                  borderRadius: 11,
-                  padding: "10px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: busy ? "default" : "pointer",
-                }}
-              >
-                Delete
-              </button>
-            ) : (
-              <button
-                onClick={remove}
-                disabled={busy}
-                style={{
-                  background: "#CF193A",
-                  color: "#FFFFFF",
-                  border: "none",
-                  borderRadius: 11,
-                  padding: "10px 16px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  cursor: busy ? "default" : "pointer",
-                }}
-              >
-                {busy ? "Removing…" : "Confirm delete"}
-              </button>
-            ))}
-          <div style={{ flex: 1 }} />
-          <button
-            onClick={onClose}
-            disabled={busy}
+
+          {/* Actions — Delete left, Cancel/Save right; wraps instead of clipping */}
+          <div
             style={{
-              background: "transparent",
-              color: "#5C5E6A",
-              border: "1px solid #EBEFF4",
-              borderRadius: 11,
-              padding: "10px 18px",
-              fontSize: "13.5px",
-              fontWeight: 600,
-              cursor: busy ? "default" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              marginTop: 14,
+              paddingTop: 14,
+              borderTop: "1px solid #F0F2F7",
             }}
           >
-            {isHandbook ? "Close" : "Cancel"}
-          </button>
-          {!isHandbook && (
+            {!isHandbook &&
+              (!confirmDelete ? (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={busy}
+                  style={{
+                    background: "transparent",
+                    color: "#CF193A",
+                    border: "1px solid #F6C9D2",
+                    borderRadius: 11,
+                    padding: "10px 16px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: busy ? "default" : "pointer",
+                  }}
+                >
+                  Delete
+                </button>
+              ) : (
+                <button
+                  onClick={remove}
+                  disabled={busy}
+                  style={{
+                    background: "#CF193A",
+                    color: "#FFFFFF",
+                    border: "none",
+                    borderRadius: 11,
+                    padding: "10px 16px",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: busy ? "default" : "pointer",
+                  }}
+                >
+                  {busy ? "Removing…" : "Confirm delete"}
+                </button>
+              ))}
+            <div style={{ flex: 1, minWidth: 8 }} />
             <button
-              onClick={save}
+              onClick={onClose}
               disabled={busy}
               style={{
-                background: "#5463D6",
-                color: "#FFFFFF",
-                border: "none",
+                background: "transparent",
+                color: "#5C5E6A",
+                border: "1px solid #EBEFF4",
                 borderRadius: 11,
                 padding: "10px 18px",
                 fontSize: "13.5px",
-                fontWeight: 700,
+                fontWeight: 600,
                 cursor: busy ? "default" : "pointer",
-                opacity: busy ? 0.7 : 1,
               }}
             >
-              {busy ? "Saving…" : "Save changes"}
+              {isHandbook ? "Close" : "Cancel"}
             </button>
-          )}
+            {!isHandbook && (
+              <button
+                onClick={save}
+                disabled={busy}
+                style={{
+                  background: "#5463D6",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 11,
+                  padding: "10px 18px",
+                  fontSize: "13.5px",
+                  fontWeight: 700,
+                  cursor: busy ? "default" : "pointer",
+                  opacity: busy ? 0.7 : 1,
+                }}
+              >
+                {busy ? "Saving…" : "Save changes"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
