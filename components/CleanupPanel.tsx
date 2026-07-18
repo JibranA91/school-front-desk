@@ -103,12 +103,33 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
+          style={{ flexShrink: 0 }}
         >
           <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
         </svg>
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: "#18181D" }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: "#18181D" }}>
           Clean up the knowledge base
         </span>
+      </div>
+      <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
+        Scans for stale, duplicate, and conflicting facts.{" "}
+        {mode === "quick" ? "Quick" : "Deep"} —{" "}
+        {mode === "quick"
+          ? "deterministic checks only (instant, no AI)."
+          : "adds AI confirmation of near-duplicates and subtle conflicts."}{" "}
+        Nothing changes without your click.
+      </div>
+
+      {/* Controls on their own row so the title never competes for width */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          marginTop: 14,
+        }}
+      >
         {/* Quick / Deep toggle */}
         <div style={{ display: "flex", background: "#F0F2F7", borderRadius: 10, padding: 3 }}>
           {(["quick", "deep"] as const).map((m) => (
@@ -122,7 +143,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
                 color: mode === m ? "#18181D" : "#737685",
                 boxShadow: mode === m ? "0 1px 3px rgba(24,24,29,.12)" : "none",
                 borderRadius: 8,
-                padding: "5px 12px",
+                padding: "6px 14px",
                 fontSize: 12.5,
                 fontWeight: 700,
                 cursor: running ? "default" : "pointer",
@@ -133,6 +154,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
             </button>
           ))}
         </div>
+        <div style={{ flex: 1, minWidth: 8 }} />
         <button
           onClick={run}
           disabled={running}
@@ -142,7 +164,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
             color: "#FFFFFF",
             border: "none",
             borderRadius: 10,
-            padding: "8px 16px",
+            padding: "9px 18px",
             fontSize: 13.5,
             fontWeight: 700,
             cursor: running ? "default" : "pointer",
@@ -151,14 +173,6 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
         >
           {running ? "Scanning…" : "Run cleanup"}
         </button>
-      </div>
-      <div style={{ fontSize: "13.5px", color: "#5C5E6A", marginTop: 6, lineHeight: 1.5 }}>
-        Scans for stale, duplicate, and conflicting facts.{" "}
-        {mode === "quick" ? "Quick" : "Deep"} —{" "}
-        {mode === "quick"
-          ? "deterministic checks only (instant, no AI)."
-          : "adds AI confirmation of near-duplicates and subtle conflicts."}{" "}
-        Nothing changes without your click.
       </div>
 
       {running && phase && (
