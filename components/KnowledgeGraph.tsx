@@ -167,6 +167,7 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           const a = index.get(e.source)!;
           const b = index.get(e.target)!;
           const incident = hover && (e.source === hover.id || e.target === hover.id);
+          const isSuper = e.rel === "supersedes";
           const authored = e.rel !== "related";
           if (hover && !incident) {
             ctx.strokeStyle = "#EAEEF5";
@@ -174,6 +175,10 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
           } else if (incident) {
             ctx.strokeStyle = "#5463D6";
             ctx.lineWidth = 1.8;
+          } else if (isSuper) {
+            // Override link (an operator fact replacing a switched-off handbook fact).
+            ctx.strokeStyle = "#E0A050";
+            ctx.lineWidth = 1.4;
           } else if (authored) {
             ctx.strokeStyle = "#9FA8E0";
             ctx.lineWidth = 1.4;
@@ -181,19 +186,22 @@ export default function KnowledgeGraph({ reloadToken = 0 }: { reloadToken?: numb
             ctx.strokeStyle = "#D9DFEA";
             ctx.lineWidth = 0.9;
           }
+          ctx.setLineDash(isSuper && !(hover && !incident) ? [5, 3] : []);
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
           ctx.stroke();
         }
+        ctx.setLineDash([]);
 
         // Nodes
         for (const n of nodes) {
           const dim = hover && n !== hover && !neighbors.has(n.id);
-          ctx.globalAlpha = dim ? 0.28 : 1;
+          const off = n.enabled === false; // disabled: in the graph but not served
+          ctx.globalAlpha = off ? 0.25 : dim ? 0.28 : 1;
           ctx.beginPath();
           ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-          ctx.fillStyle = colorOf(n.type);
+          ctx.fillStyle = off ? "#9AA0B4" : colorOf(n.type);
           ctx.fill();
           if (!n.handbook) {
             // Curated/seed nodes get a ring so they stand out from imports.

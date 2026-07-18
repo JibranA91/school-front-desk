@@ -159,6 +159,11 @@ export interface Change {
   body?: string | null;
   is_conflict: boolean;
   source: string | null;
+  /** Set when this fact overrides a read-only handbook entity (that entity's id).
+   *  Applying disables the handbook fact rather than editing it. */
+  supersedes?: string | null;
+  /** ISO date (YYYY-MM-DD) a temporary change stops applying, if any. */
+  expires?: string | null;
 }
 
 export interface Proposal {
@@ -253,6 +258,7 @@ export interface GraphNode {
   name: string;
   source: string | null;
   handbook: boolean;
+  enabled?: boolean;
 }
 
 export interface GraphEdge {

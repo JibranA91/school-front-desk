@@ -902,6 +902,38 @@ export default function OperatorView({
                           {c.name} · {c.field}: {c.new_value}
                         </span>
                       </div>
+                      {(c.supersedes || c.expires) && (
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {c.supersedes && (
+                            <span
+                              style={{
+                                fontSize: "11.5px",
+                                fontWeight: 700,
+                                color: "#4B57B8",
+                                background: "#EEF1FF",
+                                borderRadius: 999,
+                                padding: "3px 10px",
+                              }}
+                            >
+                              Overrides a handbook fact — it&apos;ll be switched off (kept as the record)
+                            </span>
+                          )}
+                          {c.expires && (
+                            <span
+                              style={{
+                                fontSize: "11.5px",
+                                fontWeight: 700,
+                                color: "#B5710A",
+                                background: "#FFF1DE",
+                                borderRadius: 999,
+                                padding: "3px 10px",
+                              }}
+                            >
+                              Temporary — auto-removes on {c.expires}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {c.body && (
                         <div
                           style={{

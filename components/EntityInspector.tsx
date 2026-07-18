@@ -6,6 +6,7 @@ import {
   deleteEntity,
   fetchEntities,
   originStyles,
+  setEntityEnabled,
   updateEntity,
   type EntityOrigin,
   type KbEntityDetail,
@@ -208,6 +209,7 @@ export default function EntityInspector({
                 padding: "12px 14px",
                 cursor: "pointer",
                 fontFamily: "inherit",
+                opacity: e.enabled === false ? 0.5 : 1,
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -227,6 +229,21 @@ export default function EntityInspector({
                   {e.type} · {e.connections} link{e.connections === 1 ? "" : "s"}
                 </div>
               </div>
+              {e.enabled === false && (
+                <span
+                  style={{
+                    background: "#F0F2F7",
+                    color: "#737685",
+                    fontSize: "10.5px",
+                    fontWeight: 700,
+                    padding: "3px 9px",
+                    borderRadius: 999,
+                    flexShrink: 0,
+                  }}
+                >
+                  Off
+                </span>
+              )}
               <span
                 style={{
                   background: o.bg,
@@ -290,6 +307,20 @@ function EntityEditor({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const o = originStyles[entity.origin];
+  const isHandbook = entity.origin === "handbook";
+  const enabled = entity.enabled ?? true;
+
+  const toggleEnabled = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await setEntityEnabled(entity.id, !enabled);
+      onSaved(); // refresh the list + close; the row reflects the new state
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Toggle failed");
+      setBusy(false);
+    }
+  };
 
   const setValue = (i: number, value: string) =>
     setFields((f) => f.map((row, j) => (j === i ? { ...row, value } : row)));
@@ -404,6 +435,24 @@ function EntityEditor({
           </div>
         )}
 
+        {isHandbook && (
+          <div
+            style={{
+              marginTop: 14,
+              background: "#FFF1DE",
+              border: "1px solid #FFE1BB",
+              borderRadius: 10,
+              padding: "9px 12px",
+              fontSize: "12px",
+              color: "#8A5A00",
+            }}
+          >
+            Handbook facts are the source of record — read-only. You can&apos;t edit
+            or delete this, but you can switch it off (hide it from parents) below.
+            To change what parents see, add an operator fact that overrides it.
+          </div>
+        )}
+
         {err && (
           <div style={{ marginTop: 12, fontSize: "12.5px", color: "#CF193A", fontWeight: 600 }}>
             {err}
@@ -418,41 +467,61 @@ function EntityEditor({
             marginTop: 20,
           }}
         >
-          {!confirmDelete ? (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              disabled={busy}
-              style={{
-                background: "transparent",
-                color: "#CF193A",
-                border: "1px solid #F6C9D2",
-                borderRadius: 11,
-                padding: "10px 16px",
-                fontSize: "13px",
-                fontWeight: 600,
-                cursor: busy ? "default" : "pointer",
-              }}
-            >
-              Delete
-            </button>
-          ) : (
-            <button
-              onClick={remove}
-              disabled={busy}
-              style={{
-                background: "#CF193A",
-                color: "#FFFFFF",
-                border: "none",
-                borderRadius: 11,
-                padding: "10px 16px",
-                fontSize: "13px",
-                fontWeight: 700,
-                cursor: busy ? "default" : "pointer",
-              }}
-            >
-              {busy ? "Removing…" : "Confirm delete"}
-            </button>
-          )}
+          <button
+            onClick={toggleEnabled}
+            disabled={busy}
+            title={
+              enabled ? "Hide this fact from parents" : "Show this fact to parents"
+            }
+            style={{
+              background: enabled ? "transparent" : "#E7F7EE",
+              color: enabled ? "#8A5A00" : "#227A47",
+              border: `1px solid ${enabled ? "#FFE1BB" : "#BFE9CF"}`,
+              borderRadius: 11,
+              padding: "10px 16px",
+              fontSize: "13px",
+              fontWeight: 700,
+              cursor: busy ? "default" : "pointer",
+            }}
+          >
+            {enabled ? "Turn off" : "Turn on"}
+          </button>
+          {!isHandbook &&
+            (!confirmDelete ? (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+                style={{
+                  background: "transparent",
+                  color: "#CF193A",
+                  border: "1px solid #F6C9D2",
+                  borderRadius: 11,
+                  padding: "10px 16px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: busy ? "default" : "pointer",
+                }}
+              >
+                Delete
+              </button>
+            ) : (
+              <button
+                onClick={remove}
+                disabled={busy}
+                style={{
+                  background: "#CF193A",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 11,
+                  padding: "10px 16px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: busy ? "default" : "pointer",
+                }}
+              >
+                {busy ? "Removing…" : "Confirm delete"}
+              </button>
+            ))}
           <div style={{ flex: 1 }} />
           <button
             onClick={onClose}
@@ -468,25 +537,27 @@ function EntityEditor({
               cursor: busy ? "default" : "pointer",
             }}
           >
-            Cancel
+            {isHandbook ? "Close" : "Cancel"}
           </button>
-          <button
-            onClick={save}
-            disabled={busy}
-            style={{
-              background: "#5463D6",
-              color: "#FFFFFF",
-              border: "none",
-              borderRadius: 11,
-              padding: "10px 18px",
-              fontSize: "13.5px",
-              fontWeight: 700,
-              cursor: busy ? "default" : "pointer",
-              opacity: busy ? 0.7 : 1,
-            }}
-          >
-            {busy ? "Saving…" : "Save changes"}
-          </button>
+          {!isHandbook && (
+            <button
+              onClick={save}
+              disabled={busy}
+              style={{
+                background: "#5463D6",
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: 11,
+                padding: "10px 18px",
+                fontSize: "13.5px",
+                fontWeight: 700,
+                cursor: busy ? "default" : "pointer",
+                opacity: busy ? 0.7 : 1,
+              }}
+            >
+              {busy ? "Saving…" : "Save changes"}
+            </button>
+          )}
         </div>
       </div>
     </div>
