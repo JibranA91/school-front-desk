@@ -855,8 +855,8 @@ def _run_clean_job(job_id: str, mode: str) -> None:
         db = SessionLocal()
         engine = cleanup.CleanupEngine()
 
-        def on_progress(key: str, done: int, total: int) -> None:
-            job.update(phase=f"Checking {key}… ({done + 1}/{total})")
+        def on_progress(message: str) -> None:
+            job.update(phase=message)
 
         result = engine.scan(db, mode=mode, progress=on_progress)
         job.update(status="done", phase="Done", **result)

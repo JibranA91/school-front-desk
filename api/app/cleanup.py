@@ -227,7 +227,7 @@ class OutdatedCheck:
 
     key = "outdated"
 
-    def scan(self, db: Session, mode: str) -> list[Finding]:
+    def scan(self, db: Session, mode: str, progress=None) -> list[Finding]:
         today = today_iso()
         horizon = (datetime.now(timezone.utc).date() + timedelta(days=7)).isoformat()
         out: list[Finding] = []
@@ -256,7 +256,7 @@ class RedundancyCheck:
 
     key = "redundancy"
 
-    def scan(self, db: Session, mode: str) -> list[Finding]:
+    def scan(self, db: Session, mode: str, progress=None) -> list[Finding]:
         ents = [e for e in db.scalars(select(models.KbEntity)).all() if e.enabled]
         deg = _degrees(db)
         groups: dict[tuple[str, str], list[models.KbEntity]] = {}
@@ -304,7 +304,7 @@ class ContradictionCheck:
 
     key = "contradiction"
 
-    def scan(self, db: Session, mode: str) -> list[Finding]:
+    def scan(self, db: Session, mode: str, progress=None) -> list[Finding]:
         ents = [e for e in db.scalars(select(models.KbEntity)).all() if e.enabled]
         buckets: dict[tuple[str, str], list[models.KbEntity]] = {}
         for e in ents:
@@ -387,7 +387,7 @@ def _near_pairs(db: Session, max_dist: float, limit: int) -> list[tuple[str, str
     return [(r.a, r.b, float(r.dist)) for r in rows]
 
 
-def _classify_pairs(db: Session, pairs: list[tuple[str, str, float]]) -> dict[int, tuple[str, str]]:
+def _classify_pairs(db: Session, pairs: list[tuple[str, str, float]], progress=None) -> dict[int, tuple[str, str]]:
     """LLM-classify each candidate pair as duplicate / contradiction / distinct.
     Runs in SMALL batches — a large structured-output list is unreliable (the
     tool-call response truncates and fails to parse past ~10 items), so we chunk
@@ -443,6 +443,8 @@ def _classify_pairs(db: Session, pairs: list[tuple[str, str, float]]) -> dict[in
                 out[v.index] = (v.relation, v.reason)
         except Exception as exc:  # noqa: BLE001
             print(f"[cleanup] pair-classify batch @{start} failed: {exc}")
+        if progress:
+            progress(f"AI review — confirmed {min(start + CHUNK, len(pairs))} / {len(pairs)} pairs…")
     return out
 
 
@@ -454,13 +456,17 @@ class LlmPairCheck:
 
     key = "AI review"
 
-    def scan(self, db: Session, mode: str) -> list[Finding]:
+    def scan(self, db: Session, mode: str, progress=None) -> list[Finding]:
         if mode != "deep" or not settings.llm_enabled or not settings.embeddings_enabled:
             return []
+        if progress:
+            progress("AI review — finding near-duplicate candidates…")
         pairs = _near_pairs(db, max_dist=0.30, limit=40)
         if not pairs:
             return []
-        verdicts = _classify_pairs(db, pairs)
+        if progress:
+            progress(f"AI review — {len(pairs)} candidate pairs to confirm…")
+        verdicts = _classify_pairs(db, pairs, progress)
         deg = _degrees(db)
         out: list[Finding] = []
         for i, (a, b, dist) in enumerate(pairs):
@@ -523,8 +529,8 @@ class CleanupEngine:
         total = len(self.checks)
         for i, check in enumerate(self.checks):
             if progress:
-                progress(check.key, i, total)
-            findings.extend(f.as_dict() for f in check.scan(db, mode))
+                progress(f"Checking {check.key}… ({i + 1}/{total})")
+            findings.extend(f.as_dict() for f in check.scan(db, mode, progress))
         # De-dupe by finding id — a pair can surface from both a deterministic and
         # the LLM tier; the earlier (deterministic) one wins.
         seen: set[str] = set()
