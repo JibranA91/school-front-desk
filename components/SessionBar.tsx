@@ -47,22 +47,27 @@ export default function SessionBar({ name }: { name: string }) {
             window.location.href = "/login";
           }}
           className="fd-ghost"
+          aria-label="Sign out"
           style={{
             border: "1px solid #EBEFF4",
             background: "transparent",
             color: "#5C5E6A",
             borderRadius: 999,
             padding: "6px 14px",
+            minHeight: 44,
+            minWidth: 44,
             fontSize: 13,
             fontWeight: 600,
             cursor: "pointer",
             transition: "all .15s",
             display: "flex",
             alignItems: "center",
+            justifyContent: "center",
             gap: 7,
           }}
         >
           <svg
+            aria-hidden="true"
             width="15"
             height="15"
             viewBox="0 0 24 24"

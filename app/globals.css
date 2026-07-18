@@ -84,7 +84,7 @@ button:focus-visible {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  white-space: nowrap;
+  white-space: normal;
   animation: fdShimmer 1.8s linear infinite, fdUp 0.28s ease both;
 }
 @keyframes fdBlink {
@@ -250,4 +250,22 @@ button:focus-visible {
 }
 .fd-nav:hover {
   filter: brightness(1.12);
+}
+
+/* Respect reduced-motion: stop the looping shimmer/spinner and quicken
+   transitions for users who ask for less animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .fd-shimmer {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    color: #5463d6;
+    animation: none !important;
+  }
 }

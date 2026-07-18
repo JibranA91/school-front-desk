@@ -12,7 +12,7 @@ import {
 } from "@/lib/frontDesk";
 
 const KIND: Record<string, { bg: string; color: string; label: string }> = {
-  outdated: { bg: "#FFF1DE", color: "#B5710A", label: "Expiring" },
+  outdated: { bg: "#FFF1DE", color: "#8A5600", label: "Expiring" },
   redundancy: { bg: "#EEF1FF", color: "#4B57B8", label: "Duplicate" },
   contradiction: { bg: "#FDEFF2", color: "#CF193A", label: "Conflict" },
 };
@@ -183,6 +183,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
                 boxShadow: mode === m ? "0 1px 3px rgba(24,24,29,.12)" : "none",
                 borderRadius: 8,
                 padding: "6px 14px",
+                minHeight: 40,
                 fontSize: 12.5,
                 fontWeight: 700,
                 cursor: running ? "default" : "pointer",
@@ -204,6 +205,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
             border: "none",
             borderRadius: 10,
             padding: "9px 18px",
+            minHeight: 44,
             fontSize: 13.5,
             fontWeight: 700,
             cursor: running ? "default" : "pointer",
@@ -215,13 +217,14 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
       </div>
 
       {running && phase && (
-        <div className="fd-shimmer" style={{ marginTop: 14, fontSize: 13, fontWeight: 600 }}>
+        <div className="fd-shimmer" role="status" aria-live="polite" style={{ marginTop: 14, fontSize: 13, fontWeight: 600 }}>
           {phase}
         </div>
       )}
 
       {error && (
         <div
+          role="alert"
           style={{
             marginTop: 14,
             fontSize: 13,
@@ -240,6 +243,8 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
         <div style={{ marginTop: 16 }}>
           {flash && (
             <div
+              role="status"
+              aria-live="polite"
               style={{
                 marginBottom: 12,
                 fontSize: 13,
@@ -299,7 +304,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
                       >
                         {g.label}
                       </span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#9497A6" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#6B6E7D" }}>
                         {queue.length} left
                       </span>
                     </div>
@@ -416,7 +421,8 @@ function FindingRow({
               background: "transparent",
               color: "#737685",
               borderRadius: 8,
-              padding: "5px 10px",
+              padding: "5px 12px",
+              minHeight: 40,
               fontSize: 12.5,
               fontWeight: 600,
               cursor: "pointer",
@@ -471,7 +477,7 @@ function FindingRow({
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 11.5, color: "#9497A6", marginTop: 2 }}>
+                  <div style={{ fontSize: 11.5, color: "#6B6E7D", marginTop: 2 }}>
                     {d ? `Added ${d}` : "Date unknown"}
                   </div>
                 </div>
@@ -506,7 +512,7 @@ function FindingRow({
 
       {!applied && f.kind === "redundancy" && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 11.5, color: "#9497A6", marginBottom: 8 }}>
+          <div style={{ fontSize: 11.5, color: "#6B6E7D", marginBottom: 8 }}>
             {f.action.keep && (
               <>
                 Keep{" "}
@@ -581,7 +587,8 @@ function ActionBtn({
         background: style.bg,
         color: style.color,
         borderRadius: 8,
-        padding: "6px 12px",
+        padding: "8px 14px",
+        minHeight: 44,
         fontSize: 12.5,
         fontWeight: 700,
         cursor: disabled ? "default" : "pointer",

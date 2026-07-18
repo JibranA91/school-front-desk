@@ -131,6 +131,7 @@ export default function EntityInspector({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search knowledge"
           placeholder="Search by name, type, or id…"
           style={{
             flex: "1 1 220px",
@@ -151,6 +152,7 @@ export default function EntityInspector({
                 onClick={() => setFilter(f.key)}
                 style={{
                   padding: "8px 13px",
+                  minHeight: 40,
                   borderRadius: 999,
                   border: active ? "1px solid #5463D6" : "1px solid #E3E8FF",
                   background: active ? "#5463D6" : "#F5F7FF",
@@ -225,7 +227,7 @@ export default function EntityInspector({
                 >
                   {e.name}
                 </div>
-                <div style={{ fontSize: "11.5px", color: "#9497A6", marginTop: 2 }}>
+                <div style={{ fontSize: "11.5px", color: "#6B6E7D", marginTop: 2 }}>
                   {e.type} · {e.connections} link{e.connections === 1 ? "" : "s"}
                 </div>
               </div>
@@ -401,7 +403,16 @@ function EntityEditor({
           >
             {o.label}
           </span>
-          <code style={{ fontSize: "11.5px", color: "#9497A6" }}>{entity.id}</code>
+          <code
+            style={{
+              fontSize: "11.5px",
+              color: "#6B6E7D",
+              overflowWrap: "anywhere",
+              minWidth: 0,
+            }}
+          >
+            {entity.id}
+          </code>
         </div>
 
         <label style={labelStyle}>Name</label>
@@ -409,6 +420,7 @@ function EntityEditor({
           value={name}
           onChange={(e) => setName(e.target.value)}
           readOnly={isHandbook}
+          aria-label="Name"
           style={isHandbook ? roInputStyle : inputStyle}
         />
 
@@ -417,12 +429,13 @@ function EntityEditor({
           value={type}
           onChange={(e) => setType(e.target.value)}
           readOnly={isHandbook}
+          aria-label="Type"
           style={isHandbook ? roInputStyle : inputStyle}
         />
 
         <label style={labelStyle}>Attributes</label>
         {fields.length === 0 && (
-          <div style={{ fontSize: "12.5px", color: "#9497A6" }}>No attributes.</div>
+          <div style={{ fontSize: "12.5px", color: "#6B6E7D" }}>No attributes.</div>
         )}
         {fields.map((f, i) => (
           <div key={f.key} style={{ marginTop: 8 }}>
@@ -433,6 +446,7 @@ function EntityEditor({
               value={f.value}
               onChange={(e) => setValue(i, e.target.value)}
               readOnly={isHandbook}
+              aria-label={f.key}
               style={{
                 ...(isHandbook ? roInputStyle : inputStyle),
                 marginTop: 4,
@@ -490,6 +504,7 @@ function EntityEditor({
             <button
               role="switch"
               aria-checked={enabled}
+              aria-label="Visible to parents"
               onClick={toggleEnabled}
               disabled={busy}
               title={
