@@ -841,6 +841,62 @@ def set_entity_enabled(
     return {"ok": True, "id": e.id, "enabled": e.enabled}
 
 
+# In-memory hygiene-scan jobs (single-process demo; swappable store later).
+_CLEAN_JOBS: dict[str, dict] = {}
+
+
+def _run_clean_job(job_id: str, mode: str) -> None:
+    """Background worker: run the deterministic expiry sweep + the registered
+    cleanup checks, updating the job's progress dict as it goes."""
+    job = _CLEAN_JOBS[job_id]
+    db = None
+    try:
+        db = SessionLocal()
+        engine = cleanup.CleanupEngine()
+
+        def on_progress(key: str, done: int, total: int) -> None:
+            job.update(phase=f"Checking {key}… ({done + 1}/{total})")
+
+        result = engine.scan(db, mode=mode, progress=on_progress)
+        job.update(status="done", phase="Done", **result)
+    except Exception as exc:  # noqa: BLE001
+        job.update(status="error", error=str(exc))
+    finally:
+        if db is not None:
+            db.close()
+
+
+class ScanRequest(BaseModel):
+    mode: str = "quick"  # 'quick' (deterministic tiers) | 'deep' (adds LLM tiers)
+
+
+@app.post("/clean/scan")
+def clean_scan(body: ScanRequest = ScanRequest()) -> dict:
+    """Start a knowledge-hygiene scan. Runs the deterministic expiry sweep, then
+    the registered checks (outdated / redundancy / contradiction), and returns a
+    job_id immediately — poll /clean/status/{job_id}. Acting on a finding reuses
+    the existing entity endpoints (delete / enable-disable / resolve)."""
+    mode = body.mode if body.mode in ("quick", "deep") else "quick"
+    job_id = uuid.uuid4().hex
+    _CLEAN_JOBS[job_id] = {
+        "status": "running",
+        "phase": "Starting…",
+        "mode": mode,
+        "findings": [],
+    }
+    threading.Thread(target=_run_clean_job, args=(job_id, mode), daemon=True).start()
+    return {"job_id": job_id}
+
+
+@app.get("/clean/status/{job_id}")
+def clean_status(job_id: str) -> dict:
+    """Live progress + results for a hygiene scan (running | done | error)."""
+    job = _CLEAN_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown clean job.")
+    return job
+
+
 def _asker_context(db: Session, inq: models.Inquiry) -> str:
     """Human label for who asked — real context for the operator ('Parent of
     Ava · Discovery Room'), or 'Prospective family' for anonymous inquiries."""
