@@ -3,6 +3,9 @@
 CLAUDE.md
 .claude
 
+# Local Codex guidance
+/AGENTS.md
+
 # Dependencies
 node_modules/
 
