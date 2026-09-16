@@ -8,6 +8,7 @@ engine (Check / CleanupEngine) will also live in this module in a later phase.
 from __future__ import annotations
 
 import re
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.config import settings
+from app.expiry import is_active, is_expired
 
 
 def today_iso() -> str:
@@ -35,7 +37,8 @@ def _snapshot(e: models.KbEntity) -> dict:
 
 def restore_superseded(db: Session, override: models.KbEntity, actor: str = "Auto-sync") -> list[str]:
     """Re-enable every node this override disabled (its outgoing `supersedes`
-    edges). Call this BEFORE removing an override, so a lapsed temporary fact
+    edges), unless another active override still replaces them. Call this BEFORE
+    removing or after disabling an override, so a lapsed temporary fact
     hands control back to the handbook fact it replaced. Logs a revertable entry
     per restored node; does not commit. Returns the restored entity ids."""
     edges = db.scalars(
@@ -47,14 +50,14 @@ def restore_superseded(db: Session, override: models.KbEntity, actor: str = "Aut
     restored: list[str] = []
     for edge in edges:
         target = db.get(models.KbEntity, edge.dst_id)
-        if target is None or target.enabled:
+        if target is None or target.enabled or active_overrides(db, target.id, exclude=override.id):
             continue
         before = _snapshot(target)
         target.enabled = True
         db.add(
             models.ChangelogEntry(
                 actor=actor,
-                action=f"Re-enabled {target.name} (override '{override.name}' removed)",
+                action=f"Re-enabled {target.name} (override '{override.name}' no longer applies)",
                 entity_id=target.id,
                 is_diff=False,
                 snapshot={"entity_id": target.id, "before": before},
@@ -64,11 +67,49 @@ def restore_superseded(db: Session, override: models.KbEntity, actor: str = "Aut
     return restored
 
 
+def active_overrides(db: Session, target_id: str, exclude: str | None = None) -> bool:
+    overrides = db.scalars(
+        select(models.KbEntity).join(
+            models.KbRelationship, models.KbRelationship.src_id == models.KbEntity.id
+        ).where(models.KbRelationship.rel == "supersedes",
+                models.KbRelationship.dst_id == target_id)
+    ).all()
+    return any(e.id != exclude and e not in db.deleted and is_active(e) for e in overrides)
+
+
+def superseded_ids(db: Session, entity_id: str) -> list[str]:
+    return list(db.scalars(select(models.KbRelationship.dst_id).where(
+        models.KbRelationship.rel == "supersedes",
+        models.KbRelationship.src_id == entity_id,
+    )))
+
+
+def sync_override(
+    db: Session, entity: models.KbEntity, actor: str = "Operator",
+    actor_user_id: uuid.UUID | None = None,
+) -> None:
+    if not is_active(entity):
+        restore_superseded(db, entity, actor)
+        return
+    for target_id in superseded_ids(db, entity.id):
+        target = db.get(models.KbEntity, target_id)
+        if target is not None and target.enabled:
+            before = _snapshot(target)
+            target.enabled = False
+            db.add(models.ChangelogEntry(
+                actor=actor, action=f"Disabled {target.name} (replaced by {entity.name})",
+                actor_user_id=actor_user_id,
+                entity_id=target.id, is_diff=False,
+                snapshot={"entity_id": target.id, "before": before},
+            ))
+
+
 def _remove(db: Session, e: models.KbEntity, actor: str) -> None:
     """Delete an entity + its incident edges; keep changelog history (unlinked);
     log a revertable removal. Self-contained twin of main._delete_entity_cascade
     (avoids importing app.main)."""
     before = _snapshot(e)
+    before["supersedes"] = superseded_ids(db, e.id)
     eid, name = e.id, e.name
     db.query(models.KbRelationship).filter(
         (models.KbRelationship.src_id == eid) | (models.KbRelationship.dst_id == eid)
@@ -88,7 +129,7 @@ def _remove(db: Session, e: models.KbEntity, actor: str) -> None:
     )
 
 
-def sweep_expired(db: Session, actor: str = "Auto-sync") -> dict:
+def sweep_expired(db: Session, actor: str = "Auto-sync", *, commit: bool = True) -> dict:
     """Deterministically clear expired overrides and restore what they
     superseded. An entity is expired when its `attributes.expires` (ISO date
     string) is before today. Authored/seed expired facts are removed; an expired
@@ -96,15 +137,14 @@ def sweep_expired(db: Session, actor: str = "Auto-sync") -> dict:
     first, so a lapsed override hands back to the handbook fact it replaced.
 
     No LLM, no operator round-trip — the operator consented to the date when the
-    fact was authored. Runs on startup and before each scan (the seed of the
-    future scheduled clean). Returns {"removed": [...], "restored": [...]}."""
-    today = today_iso()
+    fact was authored. Runs on startup, before scans, and before retrieval.
+    Retrieval uses commit=False to leave transaction ownership with its caller.
+    Returns {"removed": [...], "restored": [...]}."""
     entities = db.scalars(select(models.KbEntity)).all()
     expired = [
         e
         for e in entities
-        if isinstance((e.attributes or {}).get("expires"), str)
-        and (e.attributes or {})["expires"] < today
+        if is_expired(e.attributes or {})
     ]
     removed: list[str] = []
     restored: list[str] = []
@@ -127,7 +167,9 @@ def sweep_expired(db: Session, actor: str = "Auto-sync") -> dict:
             _remove(db, e, actor)
         removed.append(e.id)
     if expired:
-        db.commit()
+        db.flush()
+        if commit:
+            db.commit()
     return {"removed": removed, "restored": restored}
 
 
@@ -249,9 +291,8 @@ class OutdatedCheck:
 
 
 class RedundancyCheck:
-    """Deterministic tier: entities with an identical normalized name OR identical
-    body are true duplicates. (Near-duplicate detection via embeddings is the LLM
-    tier, added later.) Keeps the survivor; proposes delete only when lossless,
+    """Matching names or bodies are candidates, only identical full facts are
+    deterministic duplicates. Keeps the survivor; proposes delete only when lossless,
     disable when the duplicate is a handbook fact, else flags merge-needed."""
 
     key = "redundancy"
@@ -280,6 +321,11 @@ class RedundancyCheck:
             survivor = _pick_survivor(members, deg)
             for m in members:
                 if m.id == survivor.id:
+                    continue
+                # A matching title/body cannot establish that differing facts are redundant.
+                if m.type != survivor.type or (m.attributes or {}) != (survivor.attributes or {}):
+                    continue
+                if not m.attributes:
                     continue
                 action = _redundancy_action(db, m, survivor)
                 out.append(

@@ -30,6 +30,33 @@ Five harnesses, cheapest first:
   it, prints a summary, and writes `report.md`.
 - `report.md` — the latest run.
 
+## Cleanup regression tests
+
+`test_cleanup_regressions.py` uses Python's standard `unittest` runner and a real
+PostgreSQL database with pgvector. It covers expiry validation, duplicate safety,
+override deletion/disable/re-enable/undo, and retrieval after expiry. It runs with
+mock providers and requires no model credentials. Each test rolls back its writes,
+including commits performed inside API handlers.
+
+Use a **disposable test database**, never the demo or deployed database. For example,
+from the repository root in PowerShell:
+
+```powershell
+docker run --detach --rm --name frontdesk-tests-db -e POSTGRES_PASSWORD=test-only -e POSTGRES_DB=frontdesk_test -p 127.0.0.1:55432:5432 pgvector/pgvector:pg16
+# Wait until this reports that Postgres is accepting connections:
+docker exec frontdesk-tests-db pg_isready -U postgres -d frontdesk_test
+$env:TEST_DATABASE_URL = "postgresql+psycopg://postgres:test-only@127.0.0.1:55432/frontdesk_test"
+uv run --project api python -m unittest discover -s evals -p test_cleanup_regressions.py -v
+docker stop frontdesk-tests-db
+Remove-Item Env:TEST_DATABASE_URL
+```
+
+The suite initializes its schema and skips when `TEST_DATABASE_URL` is absent.
+Facts remain valid through their expiry date in UTC; a blank expiry means permanent.
+Malformed dates are rejected on edit/authoring. Legacy malformed dates are retained
+for staff to repair but excluded from parent answers. Retrieval reconciles expired
+overrides before answering, so the original facts become available without a restart.
+
 ## Run
 DB up + AWS creds present (for the real agent):
 ```

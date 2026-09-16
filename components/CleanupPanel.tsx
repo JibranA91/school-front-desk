@@ -157,7 +157,7 @@ export default function CleanupPanel({ onChanged }: { onChanged: () => void }) {
         {mode === "quick"
           ? "deterministic checks only (instant, no AI)."
           : "adds AI confirmation of near-duplicates and subtle conflicts."}{" "}
-        Nothing changes without your click.
+        Expired facts are cleared automatically. You review all other changes.
       </div>
 
       {/* Controls on their own row so the title never competes for width */}

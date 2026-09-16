@@ -13,10 +13,11 @@ from sqlalchemy.orm.attributes import flag_modified
 
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.config import settings
 from app.model_catalog import resolve_chat_model
+from app.expiry import normalize_attributes, parse_expiry
 from app.db import SessionLocal, get_db, init_db
 from app import agent, authoring, cleanup, ingest, models, retrieval
 from app.routers import auth as auth_router
@@ -373,6 +374,16 @@ class AuthorApplyRequest(BaseModel):
     actor: str = "Operator"
     actor_user_id: str | None = None
 
+    @field_validator("changes")
+    @classmethod
+    def validate_expiry(cls, changes: list[dict]) -> list[dict]:
+        for change in changes:
+            if "expires" in change:
+                parse_expiry(change["expires"])
+            if change.get("field") == "expires":
+                parse_expiry(change.get("new_value"))
+        return changes
+
 
 @app.post("/author/propose")
 def author_propose(body: AuthorProposeRequest, db: Session = Depends(get_db)) -> dict:
@@ -529,6 +540,7 @@ def revert_change(
         # The change created this entity — undoing it means removing it.
         label = e.name if e is not None else eid
         if e is not None:
+            cleanup.restore_superseded(db, e, actor=body.actor)
             _delete_entity_cascade(db, e)
         action = f"Reverted — removed {label}"
         entity_id = None
@@ -544,6 +556,13 @@ def revert_change(
         flag_modified(e, "attributes")
         e.sources = list(before.get("sources") or [])
         e.enabled = before.get("enabled", True)
+        for target_id in before.get("supersedes", []):
+            if db.get(models.KbEntity, target_id) is not None and target_id not in cleanup.superseded_ids(db, e.id):
+                db.add(models.KbRelationship(rel="supersedes", src_id=e.id, dst_id=target_id))
+        db.flush()
+        if cleanup.active_overrides(db, e.id):
+            e.enabled = False
+        cleanup.sync_override(db, e, actor=body.actor)
         _reembed(db, e)
         action = f"Reverted change to {before['name']}"
         entity_id = e.id
@@ -711,6 +730,11 @@ class EntityPatchRequest(BaseModel):
     actor: str = "Operator"
     actor_user_id: str | None = None
 
+    @field_validator("attributes")
+    @classmethod
+    def validate_attributes(cls, attributes: dict | None) -> dict | None:
+        return normalize_attributes(attributes) if attributes is not None else None
+
 
 @app.patch("/entity/{entity_id}")
 def update_entity(
@@ -756,6 +780,8 @@ def update_entity(
         flag_modified(e, "attributes")
     _reembed(db, e)
 
+    cleanup.sync_override(db, e, actor=body.actor)
+
     db.add(
         models.ChangelogEntry(
             actor=body.actor,
@@ -788,6 +814,7 @@ def delete_entity(
             "as the source of record and can be re-enabled anytime.",
         )
     state = _entity_state(e)
+    state["supersedes"] = cleanup.superseded_ids(db, e.id)
     # If this fact overrode others (e.g. a temporary override of a handbook
     # fact), bring those back on before removing it — same restore the expiry
     # sweep does, so a manual delete can't leave a silent coverage hole.
@@ -824,10 +851,13 @@ def set_entity_enabled(
     e = db.get(models.KbEntity, entity_id)
     if e is None:
         raise HTTPException(status_code=404, detail="Entity not found.")
+    if body.enabled and cleanup.active_overrides(db, e.id):
+        raise HTTPException(status_code=409, detail="Disable the active overrides before enabling this fact.")
     if e.enabled == body.enabled:
         return {"ok": True, "id": e.id, "enabled": e.enabled}
     before = _entity_state(e)
     e.enabled = body.enabled
+    cleanup.sync_override(db, e, actor=body.actor)
     db.add(
         models.ChangelogEntry(
             actor=body.actor,

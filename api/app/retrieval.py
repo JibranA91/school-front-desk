@@ -12,16 +12,16 @@ against entities that don't mention them — no manual stopword list needed.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from functools import lru_cache
 
 from sqlalchemy import Text, func, or_, select, text as sa_text
 from sqlalchemy.orm import Session
 
-from app import models
+from app import cleanup, models
 from app.config import settings
 from app.db import SessionLocal
 from app.embeddings import embed_query
+from app.expiry import is_active as _is_active
 from app.retrieval_base import EntitySummary, Retriever
 
 # Hybrid weights: semantic recall + lexical precision on named entities.
@@ -45,29 +45,10 @@ def _summary(e: models.KbEntity) -> dict:
     }
 
 
-def _today_iso() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
-
-
 def _active_conditions():
-    """Retrieval guard: only enabled, non-expired entities are visible to the
-    agent (and thus to parents). `expires` is an ISO YYYY-MM-DD string in
-    attributes; ISO ordering is chronological, so `>= today` keeps live facts and
-    a missing key (NULL) is always kept. Disabled/expired facts stay in the graph
-    for the operator but never reach a parent answer."""
-    exp = models.KbEntity.attributes["expires"].astext
-    return (
-        models.KbEntity.enabled.is_(True),
-        or_(exp.is_(None), exp >= _today_iso()),
-    )
-
-
-def _is_active(e: models.KbEntity) -> bool:
-    """Python mirror of `_active_conditions`, for by-id fetches / graph expansion."""
-    if not e.enabled:
-        return False
-    exp = (e.attributes or {}).get("expires")
-    return not (isinstance(exp, str) and exp and exp < _today_iso())
+    # Validate dates with the same parser used by direct retrieval and cleanup.
+    # These prototype searches already load the candidate rows before ranking.
+    return (models.KbEntity.enabled.is_(True),)
 
 
 def _searchable(entity=models.KbEntity):
@@ -98,6 +79,7 @@ def _lexical_search(db: Session, query: str, k: int) -> list[dict]:
     rows = db.execute(
         select(models.KbEntity, lexical).where(*_active_conditions())
     ).all()
+    rows = [r for r in rows if _is_active(r[0])]
 
     max_lex = max((float(r.lex) for r in rows), default=0.0) or 1.0
     scored = sorted(
@@ -123,6 +105,7 @@ def search_graph(db: Session, query: str, k: int = 5) -> list[dict]:
 
     When `settings.embeddings_enabled` is False, the vector signal is skipped
     entirely and results come from FTS alone (see `_lexical_search`)."""
+    cleanup.sweep_expired(db, commit=False)
     if not settings.embeddings_enabled:
         return _lexical_search(db, query, k)
 
@@ -137,6 +120,7 @@ def search_graph(db: Session, query: str, k: int = 5) -> list[dict]:
             models.KbEntity.embedding.is_not(None), *_active_conditions()
         )
     ).all()
+    rows = [r for r in rows if _is_active(r[0])]
 
     max_lex = max((float(r.lex) for r in rows), default=0.0) or 1.0
     scored = []
@@ -157,11 +141,13 @@ def search_graph(db: Session, query: str, k: int = 5) -> list[dict]:
 
 
 def get_entity(db: Session, entity_id: str) -> dict | None:
+    cleanup.sweep_expired(db, commit=False)
     e = db.get(models.KbEntity, entity_id)
     return _summary(e) if e and _is_active(e) else None
 
 
 def expand_neighbors(db: Session, entity_id: str, rel: str | None = None) -> list[dict]:
+    cleanup.sweep_expired(db, commit=False)
     q = select(models.KbRelationship).where(
         or_(
             models.KbRelationship.src_id == entity_id,
@@ -220,24 +206,23 @@ def retrieve_subgraph(db: Session, query: str, k: int | None = None, expand: boo
 
 class PgVectorRetriever:
     """Default `Retriever`: Postgres + pgvector (semantic) + FTS (lexical) +
-    kb_relationships (structural). Opens its own short-lived read session per
-    call, so the interface stays connection-agnostic. Delegates to the module
-    functions above."""
+    kb_relationships (structural). Each short-lived transaction also commits any
+    expiry reconciliation needed to restore the current source of truth."""
 
     def search(self, query: str, k: int = 5) -> list[EntitySummary]:
-        with SessionLocal() as db:
+        with SessionLocal.begin() as db:
             return search_graph(db, query, k)
 
     def get_entity(self, entity_id: str) -> EntitySummary | None:
-        with SessionLocal() as db:
+        with SessionLocal.begin() as db:
             return get_entity(db, entity_id)
 
     def expand_neighbors(self, entity_id: str, rel: str | None = None) -> list[EntitySummary]:
-        with SessionLocal() as db:
+        with SessionLocal.begin() as db:
             return expand_neighbors(db, entity_id, rel)
 
     def retrieve_subgraph(self, query: str, k: int | None = None, expand: bool = True) -> dict:
-        with SessionLocal() as db:
+        with SessionLocal.begin() as db:
             return retrieve_subgraph(db, query, k, expand)
 
 

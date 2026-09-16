@@ -18,8 +18,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app import models
+from app import cleanup, models
 from app.config import settings
+from app.expiry import normalize_attributes, parse_expiry
 
 
 def _norm(s: str) -> str:
@@ -168,6 +169,13 @@ def apply(
     (one entry per entity, not per field)."""
     from app.embeddings import embed_texts, entity_text
 
+    # Validate the whole proposal before mutating any entity.
+    for change in changes:
+        if "expires" in change:
+            parse_expiry(change["expires"])
+        if change.get("field") == "expires":
+            parse_expiry(change.get("new_value"))
+
     # Apply all fields; group by entity so the changelog gets one line per change.
     touched: dict[str, models.KbEntity] = {}
     per_entity: dict[str, list[dict]] = {}
@@ -199,9 +207,9 @@ def apply(
         # status flipped to "open" but body still said "closed").
         if c.get("body"):
             attrs["body"] = c["body"]
-        if c.get("expires"):
+        if "expires" in c and c.get("field") != "expires":
             attrs["expires"] = c["expires"]
-        e.attributes = attrs
+        e.attributes = normalize_attributes(attrs)
         flag_modified(e, "attributes")
         touched[e.id] = e
         per_entity.setdefault(e.id, []).append(c)
@@ -235,18 +243,6 @@ def apply(
         target = db.get(models.KbEntity, target_id)
         if target is None:
             continue
-        if target.enabled:
-            db.add(
-                models.ChangelogEntry(
-                    actor=actor,
-                    actor_user_id=actor_user_id,
-                    action=f"Disabled {target.name} (replaced by {touched[new_id].name})",
-                    entity_id=target.id,
-                    is_diff=False,
-                    snapshot={"entity_id": target_id, "before": _entity_state(target)},
-                )
-            )
-            target.enabled = False
         exists = db.scalar(
             select(models.KbRelationship).where(
                 models.KbRelationship.rel == "supersedes",
@@ -256,6 +252,10 @@ def apply(
         )
         if exists is None:
             db.add(models.KbRelationship(rel="supersedes", src_id=new_id, dst_id=target_id))
+            db.flush()
+
+    for entity in touched.values():
+        cleanup.sync_override(db, entity, actor=actor, actor_user_id=actor_user_id)
 
     if touched:  # re-embed changed entities so retrieval stays fresh
         entities = list(touched.values())
